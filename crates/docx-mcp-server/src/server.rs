@@ -394,6 +394,8 @@ impl DocxServer {
     async fn add_table(&self, Parameters(input): Parameters<TableInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
             doc.insert_table(input.index, input.rows, input.cols)
+                .width_pct(100.0)
+                .layout_fixed()
                 .borders(rdocx::BorderStyle::Single, 4, "CCCCCC");
             serde_json::json!({"index": input.index, "rows": input.rows, "cols": input.cols}).to_string()
         })
