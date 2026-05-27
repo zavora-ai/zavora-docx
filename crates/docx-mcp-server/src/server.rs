@@ -71,6 +71,12 @@ pub struct CodeBlockInput {
     pub margin: Option<f64>,
     /// Top/bottom padding in points (default 8)
     pub padding: Option<f64>,
+    /// Background color hex (default "F5F5F5")
+    pub background_color: Option<String>,
+    /// Code font (default "Courier New")
+    pub font: Option<String>,
+    /// Code font size in pt (default 9.0)
+    pub font_size: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -386,7 +392,7 @@ impl DocxServer {
     #[tool(description = "Insert a syntax-highlighted code block with gray background (Courier New 9pt). Supports 'rust' highlighting.")]
     async fn insert_code_block(&self, Parameters(input): Parameters<CodeBlockInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
-            let lines = engine::insert_code_block(doc, input.index, &input.code, input.language.as_deref(), input.margin.unwrap_or(0.3), input.padding.unwrap_or(8.0));
+            let lines = engine::insert_code_block(doc, input.index, &input.code, input.language.as_deref(), input.margin.unwrap_or(0.3), input.padding.unwrap_or(8.0), input.background_color.as_deref().unwrap_or("F5F5F5"), input.font.as_deref().unwrap_or("Courier New"), input.font_size.unwrap_or(9.0));
             serde_json::json!({"lines_inserted": lines}).to_string()
         })
     }

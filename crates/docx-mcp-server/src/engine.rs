@@ -157,13 +157,13 @@ fn token_color(kind: &TokenKind) -> Option<&'static str> {
 
 // ── Tool implementations ─────────────────────────────────────────────────────
 
-pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language: Option<&str>, margin_inches: f64, padding_pt: f64) -> usize {
+pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language: Option<&str>, margin_inches: f64, padding_pt: f64, bg_color: &str, code_font: &str, code_size: f64) -> usize {
     let lines: Vec<&str> = code.lines().collect();
     let count = lines.len();
 
     for (i, line) in lines.iter().enumerate() {
         let mut para = doc.insert_paragraph(index + i, "");
-        para = para.shading("F5F5F5")
+        para = para.shading(bg_color)
             .indent_left(Length::inches(margin_inches))
             .indent_right(Length::inches(margin_inches))
             .line_spacing_multiple(1.0)
@@ -182,14 +182,14 @@ pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language:
             let tokens = tokenize_rust(line);
             for (kind, text) in &tokens {
                 let mut run = para.add_run(text);
-                run = run.font("Courier New").size(9.0);
+                run = run.font(code_font).size(code_size);
                 if let Some(color) = token_color(kind) {
                     run.color(color);
                 }
             }
         } else {
             para.add_run(if line.is_empty() { " " } else { line })
-                .font("Courier New").size(9.0);
+                .font(code_font).size(code_size);
         }
     }
     count
