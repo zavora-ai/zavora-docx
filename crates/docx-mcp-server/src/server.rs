@@ -11,6 +11,22 @@ pub struct CreateInput {
     pub title: Option<String>,
     /// "kdp:technical", "kdp:novel", or omit for blank
     pub format: Option<String>,
+    /// Page width in inches
+    pub page_width: Option<f64>,
+    /// Page height in inches
+    pub page_height: Option<f64>,
+    /// Top margin in inches
+    pub margin_top: Option<f64>,
+    /// Bottom margin in inches
+    pub margin_bottom: Option<f64>,
+    /// Left margin in inches
+    pub margin_left: Option<f64>,
+    /// Right margin in inches
+    pub margin_right: Option<f64>,
+    /// Default font family
+    pub default_font: Option<String>,
+    /// Default font size in points
+    pub default_size: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -30,6 +46,18 @@ pub struct InsertParaInput {
     /// "Heading1", "Heading2", "Heading3", "BodyText", "BodyTextIndent", "ChapterNum", "TitlePage", "Subtitle", "Author", "Copyright"
     pub style: Option<String>,
     pub page_break_before: Option<bool>,
+    /// Font family (default "Garamond")
+    pub font: Option<String>,
+    /// Font size in points (default 11.0)
+    pub font_size: Option<f64>,
+    /// Line spacing multiplier (default 1.3)
+    pub line_spacing: Option<f64>,
+    /// Bold text
+    pub bold: Option<bool>,
+    /// Italic text
+    pub italic: Option<bool>,
+    /// Hex color e.g. "FF0000"
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -52,6 +80,12 @@ pub struct CalloutInput {
     /// "tip", "warning", or "note"
     pub callout_type: String,
     pub text: String,
+    /// Left/right margin in inches (default 0.3)
+    pub margin: Option<f64>,
+    /// Top/bottom padding in points (default 8.0)
+    pub padding: Option<f64>,
+    /// Border width in eighths of a point (default 4)
+    pub border_size: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -80,6 +114,10 @@ pub struct ImageInput {
     pub width: Option<f64>,
     /// Height in inches
     pub height: Option<f64>,
+    /// Optional caption text below image
+    pub caption: Option<String>,
+    /// Whether caption is italic (default true)
+    pub caption_italic: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -94,6 +132,8 @@ pub struct SceneBreakInput {
     pub index: usize,
     /// "asterisks", "diamond", or "blank"
     pub style: Option<String>,
+    /// Spacing above/below in points (default 18.0)
+    pub spacing: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -105,6 +145,33 @@ pub struct HeaderFooterInput {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ExportInput { pub document_handle: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DropCapInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub text: String,
+    /// Size of the drop cap letter in points (default 48.0)
+    pub size: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct EpigraphInput {
+    pub document_handle: String,
+    pub index: usize,
+    /// The quote text
+    pub quote: String,
+    /// Attribution (e.g. "— Author Name")
+    pub attribution: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FigureCaptionInput {
+    pub document_handle: String,
+    pub index: usize,
+    /// Caption text e.g. "Figure 1.1: System architecture"
+    pub caption: String,
+}
 
 // ── Server ───────────────────────────────────────────────────────────────────
 
@@ -134,7 +201,7 @@ macro_rules! with_doc {
 
 #[tool_router(server_handler)]
 impl DocxServer {
-    #[tool(description = "Create a new DOCX document. format: 'kdp:technical' for 6x9 tech book, 'kdp:novel' for 5.25x8 fiction, or omit for blank.")]
+    #[tool(description = "Create a new DOCX document. format: 'kdp:technical' for 6x9 tech book, 'kdp:novel' for 5.25x8 fiction, or omit for blank. Optional page/margin overrides.")]
     async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
         let mut doc = rdocx::Document::new();
         match input.format.as_deref() {
@@ -142,9 +209,24 @@ impl DocxServer {
             Some("kdp:novel") => engine::create_kdp_novel(&mut doc),
             _ => {}
         }
+        // Apply optional overrides
+        if input.page_width.is_some() || input.page_height.is_some() {
+            doc.set_page_size(
+                rdocx::Length::inches(input.page_width.unwrap_or(6.0)),
+                rdocx::Length::inches(input.page_height.unwrap_or(9.0)),
+            );
+        }
+        if input.margin_top.is_some() || input.margin_bottom.is_some() || input.margin_left.is_some() || input.margin_right.is_some() {
+            doc.set_margins(
+                rdocx::Length::inches(input.margin_top.unwrap_or(0.75)),
+                rdocx::Length::inches(input.margin_right.unwrap_or(0.75)),
+                rdocx::Length::inches(input.margin_bottom.unwrap_or(0.75)),
+                rdocx::Length::inches(input.margin_left.unwrap_or(0.875)),
+            );
+        }
         let mut store = self.store.lock().await;
         let handle = store.insert(doc);
-        serde_json::json!({"handle": handle}).to_string()
+        serde_json::json!({"handle": handle, "default_font": input.default_font.as_deref().unwrap_or("Garamond"), "default_size": input.default_size.unwrap_or(11.0)}).to_string()
     }
 
     #[tool(description = "Open an existing .docx file from disk")]
@@ -191,16 +273,19 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Insert a paragraph with optional style and page break. Styles: Heading1, Heading2, Heading3, BodyText, BodyTextIndent, ChapterNum, TitlePage, Subtitle, Author, Copyright")]
+    #[tool(description = "Insert a paragraph with optional style, font, size, spacing, bold, italic, color. Styles: Heading1, Heading2, Heading3, BodyText, BodyTextIndent, ChapterNum, TitlePage, Subtitle, Author, Copyright")]
     async fn insert_paragraph(&self, Parameters(input): Parameters<InsertParaInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
+            let font = input.font.as_deref().unwrap_or("Garamond");
+            let size = input.font_size.unwrap_or(11.0);
+            let spacing = input.line_spacing.unwrap_or(1.3);
+
             let mut para = doc.insert_paragraph(input.index, "");
 
             if input.page_break_before.unwrap_or(false) {
                 para = para.page_break_before(true);
             }
 
-            // Apply style-specific formatting
             let style = input.style.as_deref();
             match style {
                 Some("Heading1") => {
@@ -209,51 +294,74 @@ impl DocxServer {
                         .space_after(rdocx::Length::pt(12.0))
                         .keep_with_next(true)
                         .outline_level(0);
-                    para.add_run(&input.text).font("Garamond").size(24.0).bold(true);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(24.0)).bold(true);
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("Heading2") => {
                     para = para.space_before(rdocx::Length::pt(18.0))
                         .space_after(rdocx::Length::pt(6.0))
                         .keep_with_next(true)
                         .outline_level(1);
-                    para.add_run(&input.text).font("Garamond").size(14.0).bold(true);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(14.0)).bold(true);
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("Heading3") => {
                     para = para.space_before(rdocx::Length::pt(12.0))
                         .space_after(rdocx::Length::pt(4.0))
                         .keep_with_next(true)
                         .outline_level(2);
-                    para.add_run(&input.text).font("Garamond").size(12.0).bold(true);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(12.0)).bold(true);
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("BodyTextIndent") => {
                     para = para.first_line_indent(rdocx::Length::inches(0.3))
-                        .line_spacing_multiple(1.3);
-                    para.add_run(&input.text).font("Garamond").size(11.0);
+                        .line_spacing_multiple(spacing);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(size);
+                    if input.bold.unwrap_or(false) { run = run.bold(true); }
+                    if input.italic.unwrap_or(false) { run = run.italic(true); }
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("ChapterNum") => {
                     para = para.alignment(rdocx::Alignment::Center)
                         .space_after(rdocx::Length::pt(6.0));
-                    para.add_run(&input.text).font("Garamond").size(12.0).small_caps(true);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(12.0)).small_caps(true);
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("TitlePage") => {
                     para = para.alignment(rdocx::Alignment::Center);
-                    para.add_run(&input.text).font("Garamond").size(28.0).bold(true);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(28.0)).bold(true);
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("Subtitle") => {
                     para = para.alignment(rdocx::Alignment::Center);
-                    para.add_run(&input.text).font("Garamond").size(14.0).italic(true);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(14.0)).italic(true);
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("Author") => {
                     para = para.alignment(rdocx::Alignment::Center);
-                    para.add_run(&input.text).font("Garamond").size(14.0);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(14.0));
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 Some("Copyright") => {
-                    para.add_run(&input.text).font("Garamond").size(9.0);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(input.font_size.unwrap_or(9.0));
+                    if let Some(c) = &input.color { run.color(c); }
                 }
                 _ => {
-                    // BodyText (default)
-                    para = para.line_spacing_multiple(1.3);
-                    para.add_run(&input.text).font("Garamond").size(11.0);
+                    para = para.line_spacing_multiple(spacing);
+                    let mut run = para.add_run(&input.text);
+                    run = run.font(font).size(size);
+                    if input.bold.unwrap_or(false) { run = run.bold(true); }
+                    if input.italic.unwrap_or(false) { run = run.italic(true); }
+                    if let Some(c) = &input.color { run.color(c); }
                 }
             }
 
@@ -272,7 +380,12 @@ impl DocxServer {
     #[tool(description = "Insert a callout box with colored background and border (tip=green, warning=orange, note=blue)")]
     async fn insert_callout(&self, Parameters(input): Parameters<CalloutInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
-            engine::insert_callout(doc, input.index, &input.callout_type, &input.text);
+            engine::insert_callout(
+                doc, input.index, &input.callout_type, &input.text,
+                input.margin.unwrap_or(0.3),
+                input.padding.unwrap_or(8.0),
+                input.border_size.unwrap_or(4),
+            );
             serde_json::json!({"inserted": true}).to_string()
         })
     }
@@ -304,7 +417,7 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Add an image from file path")]
+    #[tool(description = "Add an image from file path, with optional caption")]
     async fn add_image(&self, Parameters(input): Parameters<ImageInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
             let img_data = match std::fs::read(&input.image_path) {
@@ -316,6 +429,15 @@ impl DocxServer {
             let w = rdocx::Length::inches(input.width.unwrap_or(4.0));
             let h = rdocx::Length::inches(input.height.unwrap_or(3.0));
             doc.add_picture(&img_data, &filename, w, h);
+            if let Some(caption) = &input.caption {
+                let mut para = doc.add_paragraph("");
+                para = para.alignment(rdocx::Alignment::Center);
+                let mut run = para.add_run(caption);
+                run = run.font("Garamond").size(10.0);
+                if input.caption_italic.unwrap_or(true) {
+                    run.italic(true);
+                }
+            }
             serde_json::json!({"added": true}).to_string()
         })
     }
@@ -328,10 +450,10 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Insert a scene break (for novels). style: 'asterisks', 'diamond', or 'blank'")]
+    #[tool(description = "Insert a scene break (for novels). style: 'asterisks', 'diamond', or 'blank'. Optional spacing in points.")]
     async fn insert_scene_break(&self, Parameters(input): Parameters<SceneBreakInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
-            engine::insert_scene_break(doc, input.index, input.style.as_deref().unwrap_or("asterisks"));
+            engine::insert_scene_break(doc, input.index, input.style.as_deref().unwrap_or("asterisks"), input.spacing.unwrap_or(18.0));
             serde_json::json!({"inserted": true}).to_string()
         })
     }
@@ -354,6 +476,30 @@ impl DocxServer {
                 text.push('\n');
             }
             serde_json::json!({"text": text}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a drop cap: first letter large, rest of paragraph normal size")]
+    async fn insert_drop_cap(&self, Parameters(input): Parameters<DropCapInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
+            engine::insert_drop_cap(doc, input.index, &input.text, input.size.unwrap_or(48.0));
+            serde_json::json!({"index": input.index}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert an epigraph: italic quote with optional attribution, indented right")]
+    async fn insert_epigraph(&self, Parameters(input): Parameters<EpigraphInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
+            engine::insert_epigraph(doc, input.index, &input.quote, input.attribution.as_deref());
+            serde_json::json!({"index": input.index}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a centered italic figure caption (e.g. 'Figure 1.1: description')")]
+    async fn insert_figure_caption(&self, Parameters(input): Parameters<FigureCaptionInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
+            engine::insert_figure_caption(doc, input.index, &input.caption);
+            serde_json::json!({"index": input.index}).to_string()
         })
     }
 }

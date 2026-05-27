@@ -39,22 +39,19 @@ pub fn new_store() -> SharedStore {
 
 // ── KDP Templates ────────────────────────────────────────────────────────────
 
-/// Create a KDP-formatted technical book document (6×9, Garamond, proper styles).
 pub fn create_kdp_technical(doc: &mut Document) {
-    // Page: 6" × 9"
     doc.set_page_size(Length::inches(6.0), Length::inches(9.0));
     doc.set_margins(
-        Length::inches(0.75),  // top
-        Length::inches(0.75),  // right (outside)
-        Length::inches(0.75),  // bottom
-        Length::inches(0.875), // left (inside/gutter)
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.875),
     );
     doc.set_footer("{{PAGE}}");
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
 }
 
-/// Create a KDP novel document (5.25×8, Garamond).
 pub fn create_kdp_novel(doc: &mut Document) {
     doc.set_page_size(Length::inches(5.25), Length::inches(8.0));
     doc.set_margins(
@@ -68,25 +65,22 @@ pub fn create_kdp_novel(doc: &mut Document) {
     doc.set_first_page_footer("");
 }
 
-// ── Paragraph helpers ────────────────────────────────────────────────────────
+// ── Syntax highlighting ──────────────────────────────────────────────────────
 
-/// Syntax highlighting colors for common tokens.
 struct SyntaxColors;
 impl SyntaxColors {
-    const KEYWORD: &str = "0000FF";    // blue
-    const STRING: &str = "A31515";     // dark red
-    const COMMENT: &str = "008000";    // green
-    const FUNCTION: &str = "795E26";   // brown
-    const TYPE: &str = "267F99";       // teal
-    const NUMBER: &str = "098658";     // dark green
-    const MACRO: &str = "AF00DB";      // purple
+    const KEYWORD: &str = "0000FF";
+    const STRING: &str = "A31515";
+    const COMMENT: &str = "008000";
+    const FUNCTION: &str = "795E26";
+    const TYPE: &str = "267F99";
+    const NUMBER: &str = "098658";
+    const MACRO: &str = "AF00DB";
 }
 
-/// Simple token types for syntax highlighting.
 #[allow(dead_code)]
 enum TokenKind { Keyword, String, Comment, Function, Type, Number, Macro, Plain }
 
-/// Tokenize a line of Rust code (simple heuristic-based).
 fn tokenize_rust(line: &str) -> Vec<(TokenKind, String)> {
     let mut tokens = Vec::new();
     let keywords = ["use", "fn", "let", "mut", "pub", "struct", "impl", "async", "await",
@@ -161,7 +155,8 @@ fn token_color(kind: &TokenKind) -> Option<&'static str> {
     }
 }
 
-/// Insert a syntax-highlighted code block with gray background.
+// ── Tool implementations ─────────────────────────────────────────────────────
+
 pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language: Option<&str>, margin_inches: f64, padding_pt: f64) -> usize {
     let lines: Vec<&str> = code.lines().collect();
     let count = lines.len();
@@ -183,7 +178,6 @@ pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language:
             para = para.space_after(Length::pt(padding_pt));
         }
 
-        // Apply syntax highlighting for Rust
         if matches!(language, Some("rust" | "rs")) {
             let tokens = tokenize_rust(line);
             for (kind, text) in &tokens {
@@ -201,8 +195,7 @@ pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language:
     count
 }
 
-/// Insert a callout box with colored left border.
-pub fn insert_callout(doc: &mut Document, index: usize, callout_type: &str, text: &str) {
+pub fn insert_callout(doc: &mut Document, index: usize, callout_type: &str, text: &str, margin: f64, padding: f64, border_size: u32) {
     let (prefix, border_color, bg_color) = match callout_type {
         "warning" => ("⚠ WARNING: ", "ED7D31", "FFF2CC"),
         "note" => ("📝 NOTE: ", "4472C4", "D9E2F3"),
@@ -212,18 +205,17 @@ pub fn insert_callout(doc: &mut Document, index: usize, callout_type: &str, text
     let mut para = doc.insert_paragraph(index, "");
     para = para
         .shading(bg_color)
-        .border_all(BorderStyle::Single, 4, border_color)
-        .indent_left(Length::inches(0.3))
-        .indent_right(Length::inches(0.2))
-        .space_before(Length::pt(8.0))
-        .space_after(Length::pt(8.0));
+        .border_all(BorderStyle::Single, border_size, border_color)
+        .indent_left(Length::inches(margin))
+        .indent_right(Length::inches(margin))
+        .space_before(Length::pt(padding))
+        .space_after(Length::pt(padding));
 
     para.add_run(prefix).font("Garamond").size(10.0).bold(true);
     para.add_run(text).font("Garamond").size(10.0);
 }
 
-/// Insert a scene break for novels.
-pub fn insert_scene_break(doc: &mut Document, index: usize, style: &str) {
+pub fn insert_scene_break(doc: &mut Document, index: usize, style: &str, spacing: f64) {
     let symbol = match style {
         "diamond" => "◆",
         "blank" => "",
@@ -232,9 +224,46 @@ pub fn insert_scene_break(doc: &mut Document, index: usize, style: &str) {
     let mut para = doc.insert_paragraph(index, "");
     para = para
         .alignment(Alignment::Center)
-        .space_before(Length::pt(18.0))
-        .space_after(Length::pt(18.0));
+        .space_before(Length::pt(spacing))
+        .space_after(Length::pt(spacing));
     if !symbol.is_empty() {
         para.add_run(symbol).font("Garamond").size(11.0);
     }
+}
+
+pub fn insert_drop_cap(doc: &mut Document, index: usize, text: &str, size: f64) {
+    let first = &text[..text.chars().next().map(|c| c.len_utf8()).unwrap_or(0)];
+    let rest = &text[first.len()..];
+
+    let mut para = doc.insert_paragraph(index, "");
+    para = para.line_spacing_multiple(1.3);
+    para.add_run(first).font("Garamond").size(size);
+    para.add_run(rest).font("Garamond").size(11.0);
+}
+
+pub fn insert_epigraph(doc: &mut Document, index: usize, quote: &str, attribution: Option<&str>) {
+    let mut para = doc.insert_paragraph(index, "");
+    para = para
+        .indent_left(Length::inches(1.5))
+        .indent_right(Length::inches(0.5))
+        .space_after(Length::pt(4.0));
+    para.add_run(quote).font("Garamond").size(10.0).italic(true);
+
+    if let Some(attr) = attribution {
+        let mut p2 = doc.insert_paragraph(index + 1, "");
+        p2 = p2
+            .indent_left(Length::inches(1.5))
+            .indent_right(Length::inches(0.5))
+            .space_after(Length::pt(12.0));
+        p2.add_run(attr).font("Garamond").size(10.0);
+    }
+}
+
+pub fn insert_figure_caption(doc: &mut Document, index: usize, caption: &str) {
+    let mut para = doc.insert_paragraph(index, "");
+    para = para
+        .alignment(Alignment::Center)
+        .space_before(Length::pt(4.0))
+        .space_after(Length::pt(8.0));
+    para.add_run(caption).font("Garamond").size(10.0).italic(true);
 }
