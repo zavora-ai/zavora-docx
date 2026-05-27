@@ -409,11 +409,17 @@ impl DocxServer {
 
             match style {
                 "plain" => {
-                    // No borders, no shading
+                    table = table.cell_margins(
+                        rdocx::Length::pt(2.0), rdocx::Length::pt(6.0),
+                        rdocx::Length::pt(2.0), rdocx::Length::pt(6.0),
+                    );
                 }
                 "minimal" => {
-                    // Only top/bottom borders on header row
-                    table = table.borders(rdocx::BorderStyle::None, 0, "FFFFFF");
+                    table = table.borders(rdocx::BorderStyle::None, 0, "FFFFFF")
+                        .cell_margins(
+                            rdocx::Length::pt(2.0), rdocx::Length::pt(6.0),
+                            rdocx::Length::pt(2.0), rdocx::Length::pt(6.0),
+                        );
                     if let Some(mut row) = table.row(0) {
                         row = row.header();
                         for ci in 0..input.cols {
@@ -424,8 +430,11 @@ impl DocxServer {
                     }
                 }
                 "striped" => {
-                    table = table.borders(rdocx::BorderStyle::Single, 4, "DDDDDD");
-                    // Shade alternating rows
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "DDDDDD")
+                        .cell_margins(
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                        );
                     for ri in 0..input.rows {
                         if ri == 0 {
                             if let Some(mut row) = table.row(ri) {
@@ -448,7 +457,11 @@ impl DocxServer {
                     }
                 }
                 "dark_header" => {
-                    table = table.borders(rdocx::BorderStyle::Single, 4, "999999");
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "999999")
+                        .cell_margins(
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                        );
                     if let Some(mut row) = table.row(0) {
                         row = row.header();
                         for ci in 0..input.cols {
@@ -459,7 +472,11 @@ impl DocxServer {
                     }
                 }
                 "blue_header" => {
-                    table = table.borders(rdocx::BorderStyle::Single, 4, "BDD7EE");
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "BDD7EE")
+                        .cell_margins(
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                        );
                     if let Some(mut row) = table.row(0) {
                         row = row.header();
                         for ci in 0..input.cols {
@@ -468,7 +485,6 @@ impl DocxServer {
                             }
                         }
                     }
-                    // Light blue alternating
                     for ri in (2..input.rows).step_by(2) {
                         if let Some(mut row) = table.row(ri) {
                             for ci in 0..input.cols {
@@ -480,13 +496,11 @@ impl DocxServer {
                     }
                 }
                 "elegant" => {
-                    table = table.borders(rdocx::BorderStyle::Single, 2, "BFBFBF");
-                    table = table.cell_margins(
-                        rdocx::Length::pt(4.0),
-                        rdocx::Length::pt(6.0),
-                        rdocx::Length::pt(4.0),
-                        rdocx::Length::pt(6.0),
-                    );
+                    table = table.borders(rdocx::BorderStyle::Single, 2, "BFBFBF")
+                        .cell_margins(
+                            rdocx::Length::pt(4.0), rdocx::Length::pt(10.0),
+                            rdocx::Length::pt(4.0), rdocx::Length::pt(10.0),
+                        );
                     if let Some(mut row) = table.row(0) {
                         row = row.header();
                         for ci in 0..input.cols {
@@ -498,7 +512,11 @@ impl DocxServer {
                 }
                 _ => {
                     // "grid" - default
-                    table = table.borders(rdocx::BorderStyle::Single, 4, "CCCCCC");
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "CCCCCC")
+                        .cell_margins(
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                            rdocx::Length::pt(3.0), rdocx::Length::pt(8.0),
+                        );
                 }
             }
 
