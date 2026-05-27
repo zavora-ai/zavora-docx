@@ -171,7 +171,9 @@ pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language:
         para = para.shading("F5F5F5")
             .indent_left(Length::inches(0.2))
             .indent_right(Length::inches(0.2))
-            .line_spacing(1.0)
+            .line_spacing_multiple(1.0)
+            .space_before(Length::pt(0.0))
+            .space_after(Length::pt(0.0))
             .keep_together(true);
 
         if i == 0 {
