@@ -94,7 +94,7 @@ pub fn create_kdp_children(doc: &mut Document) {
 
 // ── Cookbook tools ────────────────────────────────────────────────────────────
 
-/// Insert a complete recipe layout.
+/// Insert a complete recipe layout — professional 2-column with hero image support.
 pub fn insert_recipe(
     doc: &mut Document,
     index: usize,
@@ -109,74 +109,84 @@ pub fn insert_recipe(
 ) -> usize {
     let mut pos = index;
 
-    // Recipe title — bold, large, with bottom border
+    // Recipe title — large, bold, uppercase feel
     let mut para = doc.insert_paragraph(pos, "");
-    para = para.space_before(Length::pt(12.0))
-        .space_after(Length::pt(4.0))
-        .border_bottom(BorderStyle::Single, 8, "E67E22");
-    para.add_run(title).font("Georgia").size(20.0).bold(true);
+    para = para.space_before(Length::pt(24.0)).space_after(Length::pt(2.0));
+    para.add_run(title).font("Georgia").size(26.0).bold(true).color("2C2C2C");
     pos += 1;
 
-    // Subtitle (optional)
+    // Subtitle
     if let Some(sub) = subtitle {
         let mut para = doc.insert_paragraph(pos, "");
-        para = para.space_after(Length::pt(4.0));
-        para.add_run(sub).font("Georgia").size(11.0).italic(true).color("666666");
+        para = para.space_after(Length::pt(8.0));
+        para.add_run(sub).font("Georgia").size(10.5).italic(true).color("777777");
         pos += 1;
     }
 
-    // Prep info line
+    // Serving badge — right-aligned, bold
     let mut para = doc.insert_paragraph(pos, "");
-    para = para.space_before(Length::pt(6.0)).space_after(Length::pt(12.0));
-    para.add_run(&format!("Prep: {}  |  Cook: {}  |  Serves: {}", prep_time, cook_time, servings))
-        .font("Georgia").size(9.0).color("888888");
+    para = para.alignment(Alignment::Right).space_after(Length::pt(4.0));
+    para.add_run(&format!("SERVES {}", servings)).font("Georgia").size(9.0).bold(true).all_caps(true).color("E67E22");
     pos += 1;
 
-    // INGREDIENTS header
+    // Thin separator line
     let mut para = doc.insert_paragraph(pos, "");
-    para = para.space_before(Length::pt(8.0)).space_after(Length::pt(4.0));
-    para.add_run("INGREDIENTS").font("Georgia").size(9.0).bold(true).all_caps(true).color("333333");
+    para = para.border_bottom(BorderStyle::Single, 4, "E0E0E0")
+        .space_after(Length::pt(12.0));
     pos += 1;
 
-    // Ingredient list
-    for item in ingredients {
-        let mut para = doc.insert_paragraph(pos, "");
-        para = para.indent_left(Length::inches(0.2))
-            .space_before(Length::pt(1.0))
-            .space_after(Length::pt(1.0));
-        para.add_run(&format!("—  {}", item)).font("Georgia").size(10.0);
-        pos += 1;
+    // Prep info — compact, gray
+    let mut para = doc.insert_paragraph(pos, "");
+    para = para.space_after(Length::pt(12.0));
+    para.add_run("PREP ").font("Georgia").size(8.0).bold(true).color("999999");
+    para.add_run(prep_time).font("Georgia").size(9.0).color("444444");
+    para.add_run("   COOK ").font("Georgia").size(8.0).bold(true).color("999999");
+    para.add_run(cook_time).font("Georgia").size(9.0).color("444444");
+    pos += 1;
+
+    // Two-column table: Ingredients | Method
+    let mut table = doc.insert_table(pos, 1, 2);
+    table = table.width_pct(100.0).layout_fixed()
+        .cell_margins(
+            Length::pt(6.0), Length::pt(12.0),
+            Length::pt(6.0), Length::pt(0.0),
+        );
+    pos += 1;
+
+    // Fill ingredients column
+    if let Some(mut cell) = table.cell(0, 0) {
+        cell = cell.width(Length::inches(2.5));
+        let mut p = cell.add_paragraph("");
+        p.add_run("INGREDIENTS").font("Georgia").size(8.5).bold(true).all_caps(true).color("2C2C2C");
+        for item in ingredients {
+            let mut p = cell.add_paragraph("");
+            p = p.space_before(Length::pt(2.0)).space_after(Length::pt(2.0));
+            p.add_run(item).font("Georgia").size(9.5).color("444444");
+        }
     }
 
-    // INSTRUCTIONS header
-    let mut para = doc.insert_paragraph(pos, "");
-    para = para.space_before(Length::pt(12.0)).space_after(Length::pt(4.0));
-    para.add_run("INSTRUCTIONS").font("Georgia").size(9.0).bold(true).all_caps(true).color("333333");
-    pos += 1;
-
-    // Numbered instructions
-    for (i, step) in instructions.iter().enumerate() {
-        let mut para = doc.insert_paragraph(pos, "");
-        para = para.indent_left(Length::inches(0.3))
-            .hanging_indent(Length::inches(0.3))
-            .space_before(Length::pt(3.0))
-            .space_after(Length::pt(3.0));
-        para.add_run(&format!("{}.", i + 1)).font("Georgia").size(10.0).bold(true).color("E67E22");
-        para.add_run(&format!("  {}", step)).font("Georgia").size(10.0);
-        pos += 1;
+    // Fill method column
+    if let Some(mut cell) = table.cell(0, 1) {
+        let mut p = cell.add_paragraph("");
+        p.add_run("METHOD").font("Georgia").size(8.5).bold(true).all_caps(true).color("2C2C2C");
+        for (i, step) in instructions.iter().enumerate() {
+            let mut p = cell.add_paragraph("");
+            p = p.space_before(Length::pt(4.0)).space_after(Length::pt(4.0));
+            p.add_run(&format!("{}  ", i + 1)).font("Georgia").size(9.5).bold(true).color("E67E22");
+            p.add_run(step).font("Georgia").size(9.5).color("333333");
+        }
     }
 
-    // Chef's tip (optional)
+    // Chef's tip
     if let Some(tip) = chef_tip {
         let mut para = doc.insert_paragraph(pos, "");
-        para = para.shading("FFF8F0")
-            .border_all(BorderStyle::Single, 4, "E67E22")
-            .indent_left(Length::inches(0.2))
-            .indent_right(Length::inches(0.2))
-            .space_before(Length::pt(12.0))
+        para = para.shading("FDF6EE")
+            .indent_left(Length::inches(0.15))
+            .indent_right(Length::inches(0.15))
+            .space_before(Length::pt(16.0))
             .space_after(Length::pt(8.0));
-        para.add_run("👨‍🍳 CHEF'S TIP: ").font("Georgia").size(9.0).bold(true).color("E67E22");
-        para.add_run(tip).font("Georgia").size(9.0).italic(true);
+        para.add_run("CHEF'S TIP: ").font("Georgia").size(8.5).bold(true).color("E67E22");
+        para.add_run(tip).font("Georgia").size(9.0).italic(true).color("555555");
         pos += 1;
     }
 
@@ -457,4 +467,19 @@ pub fn insert_figure_caption(doc: &mut Document, index: usize, caption: &str) {
         .space_before(Length::pt(4.0))
         .space_after(Length::pt(8.0));
     para.add_run(caption).font("Garamond").size(10.0).italic(true);
+}
+
+/// Create a KDP chapter book document (5.5×8.5, justified text, running headers, illustration-friendly).
+/// For ages 7-12 (Matilda, Harry Potter, Percy Jackson style).
+pub fn create_kdp_chapter_book(doc: &mut Document) {
+    doc.set_page_size(Length::inches(5.5), Length::inches(8.5));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.7),
+        Length::inches(0.75),
+        Length::inches(0.85),
+    );
+    doc.set_footer_page_number();
+    doc.set_different_first_page(true);
+    doc.set_first_page_footer("");
 }

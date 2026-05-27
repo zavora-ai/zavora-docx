@@ -275,6 +275,7 @@ impl DocxServer {
             Some("kdp:novel") => engine::create_kdp_novel(&mut doc),
             Some("kdp:cookbook") => engine::create_kdp_cookbook(&mut doc),
             Some("kdp:children") => engine::create_kdp_children(&mut doc),
+            Some("kdp:chapter_book") => engine::create_kdp_chapter_book(&mut doc),
             _ => {}
         }
         // Apply optional overrides
