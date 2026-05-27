@@ -230,6 +230,15 @@ impl Document {
             .collect()
     }
 
+    /// Get a mutable reference to the nth table in the document.
+    pub fn table_mut(&mut self, index: usize) -> Option<Table<'_>> {
+        self.document
+            .body
+            .tables_mut()
+            .nth(index)
+            .map(|t| Table { inner: t })
+    }
+
     /// Add a table with the specified number of rows and columns.
     /// Returns a mutable reference for further configuration.
     pub fn add_table(&mut self, rows: usize, cols: usize) -> Table<'_> {

@@ -1,0 +1,22 @@
+[package]
+name = "docx-mcp-server"
+version = "2.0.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.93"
+description = "DOCX MCP Server — professional book formatting with syntax highlighting, shaded code blocks, callout boxes, and KDP templates"
+repository = "https://github.com/zavora-ai/docx-mcp"
+keywords = ["mcp", "docx", "word", "document", "ai"]
+categories = ["command-line-utilities", "text-processing"]
+readme = "README.md"
+
+[dependencies]
+rdocx = { path = "../rdocx" }
+rmcp = { version = "1.7", features = ["server", "transport-io", "macros"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+anyhow = "1"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2"

@@ -8,6 +8,7 @@ members = [
     "crates/rdocx-pdf",
     "crates/rdocx-html",
     "crates/rdocx-cli",
+    "crates/docx-mcp-server",
 ]
 exclude = [
     "crates/rdocx-wasm",
