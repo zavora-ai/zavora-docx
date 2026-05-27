@@ -162,25 +162,25 @@ fn token_color(kind: &TokenKind) -> Option<&'static str> {
 }
 
 /// Insert a syntax-highlighted code block with gray background.
-pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language: Option<&str>) -> usize {
+pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language: Option<&str>, margin_inches: f64, padding_pt: f64) -> usize {
     let lines: Vec<&str> = code.lines().collect();
     let count = lines.len();
 
     for (i, line) in lines.iter().enumerate() {
         let mut para = doc.insert_paragraph(index + i, "");
         para = para.shading("F5F5F5")
-            .indent_left(Length::inches(0.3))
-            .indent_right(Length::inches(0.3))
+            .indent_left(Length::inches(margin_inches))
+            .indent_right(Length::inches(margin_inches))
             .line_spacing_multiple(1.0)
             .space_before(Length::pt(0.0))
             .space_after(Length::pt(0.0))
             .keep_together(true);
 
         if i == 0 {
-            para = para.space_before(Length::pt(8.0));
+            para = para.space_before(Length::pt(padding_pt));
         }
         if i == count - 1 {
-            para = para.space_after(Length::pt(8.0));
+            para = para.space_after(Length::pt(padding_pt));
         }
 
         // Apply syntax highlighting for Rust
