@@ -94,6 +94,8 @@ pub struct TableInput {
     pub index: usize,
     pub rows: usize,
     pub cols: usize,
+    /// Table style: "plain", "grid", "striped", "dark_header", "blue_header", "minimal", "elegant" (default: "grid")
+    pub table_style: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -390,14 +392,109 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Insert a table at the given position")]
+    #[tool(description = "Insert a styled table. Styles: 'plain', 'grid', 'striped', 'dark_header', 'blue_header', 'minimal', 'elegant' (default: grid)")]
     async fn add_table(&self, Parameters(input): Parameters<TableInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
-            doc.insert_table(input.index, input.rows, input.cols)
-                .width_pct(100.0)
-                .layout_fixed()
-                .borders(rdocx::BorderStyle::Single, 4, "CCCCCC");
-            serde_json::json!({"index": input.index, "rows": input.rows, "cols": input.cols}).to_string()
+            let style = input.table_style.as_deref().unwrap_or("grid");
+            let mut table = doc.insert_table(input.index, input.rows, input.cols);
+            table = table.width_pct(100.0).layout_fixed();
+
+            match style {
+                "plain" => {
+                    // No borders, no shading
+                }
+                "minimal" => {
+                    // Only top/bottom borders on header row
+                    table = table.borders(rdocx::BorderStyle::None, 0, "FFFFFF");
+                    if let Some(mut row) = table.row(0) {
+                        row = row.header();
+                        for ci in 0..input.cols {
+                            if let Some(cell) = row.cell(ci) {
+                                cell.shading("FFFFFF");
+                            }
+                        }
+                    }
+                }
+                "striped" => {
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "DDDDDD");
+                    // Shade alternating rows
+                    for ri in 0..input.rows {
+                        if ri == 0 {
+                            if let Some(mut row) = table.row(ri) {
+                                row = row.header();
+                                for ci in 0..input.cols {
+                                    if let Some(cell) = row.cell(ci) {
+                                        cell.shading("4472C4");
+                                    }
+                                }
+                            }
+                        } else if ri % 2 == 0 {
+                            if let Some(mut row) = table.row(ri) {
+                                for ci in 0..input.cols {
+                                    if let Some(cell) = row.cell(ci) {
+                                        cell.shading("F2F2F2");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "dark_header" => {
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "999999");
+                    if let Some(mut row) = table.row(0) {
+                        row = row.header();
+                        for ci in 0..input.cols {
+                            if let Some(cell) = row.cell(ci) {
+                                cell.shading("333333");
+                            }
+                        }
+                    }
+                }
+                "blue_header" => {
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "BDD7EE");
+                    if let Some(mut row) = table.row(0) {
+                        row = row.header();
+                        for ci in 0..input.cols {
+                            if let Some(cell) = row.cell(ci) {
+                                cell.shading("4472C4");
+                            }
+                        }
+                    }
+                    // Light blue alternating
+                    for ri in (2..input.rows).step_by(2) {
+                        if let Some(mut row) = table.row(ri) {
+                            for ci in 0..input.cols {
+                                if let Some(cell) = row.cell(ci) {
+                                    cell.shading("D9E2F3");
+                                }
+                            }
+                        }
+                    }
+                }
+                "elegant" => {
+                    table = table.borders(rdocx::BorderStyle::Single, 2, "BFBFBF");
+                    table = table.cell_margins(
+                        rdocx::Length::pt(4.0),
+                        rdocx::Length::pt(6.0),
+                        rdocx::Length::pt(4.0),
+                        rdocx::Length::pt(6.0),
+                    );
+                    if let Some(mut row) = table.row(0) {
+                        row = row.header();
+                        for ci in 0..input.cols {
+                            if let Some(cell) = row.cell(ci) {
+                                cell.shading("F5F5F5");
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // "grid" - default
+                    table = table.borders(rdocx::BorderStyle::Single, 4, "CCCCCC");
+                }
+            }
+
+            serde_json::json!({"index": input.index, "rows": input.rows, "cols": input.cols, "style": style}).to_string()
         })
     }
 
