@@ -65,6 +65,197 @@ pub fn create_kdp_novel(doc: &mut Document) {
     doc.set_first_page_footer("");
 }
 
+/// Create a KDP cookbook document (8×10, Georgia body, generous margins for photos).
+pub fn create_kdp_cookbook(doc: &mut Document) {
+    doc.set_page_size(Length::inches(8.0), Length::inches(10.0));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(1.0), // larger gutter for lay-flat binding
+    );
+    doc.set_footer_page_number();
+    doc.set_different_first_page(true);
+    doc.set_first_page_footer("");
+}
+
+/// Create a KDP children's book document (8.5×8.5 square, minimal margins).
+pub fn create_kdp_children(doc: &mut Document) {
+    doc.set_page_size(Length::inches(8.5), Length::inches(8.5));
+    doc.set_margins(
+        Length::inches(0.5),
+        Length::inches(0.5),
+        Length::inches(0.5),
+        Length::inches(0.5),
+    );
+    // No page numbers for children's books
+    doc.set_different_first_page(true);
+}
+
+// ── Cookbook tools ────────────────────────────────────────────────────────────
+
+/// Insert a complete recipe layout.
+pub fn insert_recipe(
+    doc: &mut Document,
+    index: usize,
+    title: &str,
+    subtitle: Option<&str>,
+    prep_time: &str,
+    cook_time: &str,
+    servings: &str,
+    ingredients: &[String],
+    instructions: &[String],
+    chef_tip: Option<&str>,
+) -> usize {
+    let mut pos = index;
+
+    // Recipe title — bold, large, with bottom border
+    let mut para = doc.insert_paragraph(pos, "");
+    para = para.space_before(Length::pt(12.0))
+        .space_after(Length::pt(4.0))
+        .border_bottom(BorderStyle::Single, 8, "E67E22");
+    para.add_run(title).font("Georgia").size(20.0).bold(true);
+    pos += 1;
+
+    // Subtitle (optional)
+    if let Some(sub) = subtitle {
+        let mut para = doc.insert_paragraph(pos, "");
+        para = para.space_after(Length::pt(4.0));
+        para.add_run(sub).font("Georgia").size(11.0).italic(true).color("666666");
+        pos += 1;
+    }
+
+    // Prep info line
+    let mut para = doc.insert_paragraph(pos, "");
+    para = para.space_before(Length::pt(6.0)).space_after(Length::pt(12.0));
+    para.add_run(&format!("Prep: {}  |  Cook: {}  |  Serves: {}", prep_time, cook_time, servings))
+        .font("Georgia").size(9.0).color("888888");
+    pos += 1;
+
+    // INGREDIENTS header
+    let mut para = doc.insert_paragraph(pos, "");
+    para = para.space_before(Length::pt(8.0)).space_after(Length::pt(4.0));
+    para.add_run("INGREDIENTS").font("Georgia").size(9.0).bold(true).all_caps(true).color("333333");
+    pos += 1;
+
+    // Ingredient list
+    for item in ingredients {
+        let mut para = doc.insert_paragraph(pos, "");
+        para = para.indent_left(Length::inches(0.2))
+            .space_before(Length::pt(1.0))
+            .space_after(Length::pt(1.0));
+        para.add_run(&format!("—  {}", item)).font("Georgia").size(10.0);
+        pos += 1;
+    }
+
+    // INSTRUCTIONS header
+    let mut para = doc.insert_paragraph(pos, "");
+    para = para.space_before(Length::pt(12.0)).space_after(Length::pt(4.0));
+    para.add_run("INSTRUCTIONS").font("Georgia").size(9.0).bold(true).all_caps(true).color("333333");
+    pos += 1;
+
+    // Numbered instructions
+    for (i, step) in instructions.iter().enumerate() {
+        let mut para = doc.insert_paragraph(pos, "");
+        para = para.indent_left(Length::inches(0.3))
+            .hanging_indent(Length::inches(0.3))
+            .space_before(Length::pt(3.0))
+            .space_after(Length::pt(3.0));
+        para.add_run(&format!("{}.", i + 1)).font("Georgia").size(10.0).bold(true).color("E67E22");
+        para.add_run(&format!("  {}", step)).font("Georgia").size(10.0);
+        pos += 1;
+    }
+
+    // Chef's tip (optional)
+    if let Some(tip) = chef_tip {
+        let mut para = doc.insert_paragraph(pos, "");
+        para = para.shading("FFF8F0")
+            .border_all(BorderStyle::Single, 4, "E67E22")
+            .indent_left(Length::inches(0.2))
+            .indent_right(Length::inches(0.2))
+            .space_before(Length::pt(12.0))
+            .space_after(Length::pt(8.0));
+        para.add_run("👨‍🍳 CHEF'S TIP: ").font("Georgia").size(9.0).bold(true).color("E67E22");
+        para.add_run(tip).font("Georgia").size(9.0).italic(true);
+        pos += 1;
+    }
+
+    pos - index
+}
+
+// ── Children's book tools ────────────────────────────────────────────────────
+
+/// Insert a full-page spread: large image with text positioned below, above, or as overlay.
+pub fn insert_spread(
+    doc: &mut Document,
+    index: usize,
+    text: &str,
+    text_position: &str,
+    font_size: f64,
+    page_break: bool,
+) -> usize {
+    let mut pos = index;
+
+    if page_break && pos > 0 {
+        let para = doc.insert_paragraph(pos, "");
+        para.page_break_before(true);
+        pos += 1;
+    }
+
+    match text_position {
+        "top" => {
+            // Text first, then space for image
+            let mut para = doc.insert_paragraph(pos, "");
+            para = para.alignment(Alignment::Center)
+                .space_after(Length::pt(24.0));
+            para.add_run(text).font("Century Schoolbook").size(font_size);
+            pos += 1;
+            // Placeholder for image area
+            let mut para = doc.insert_paragraph(pos, "");
+            para = para.alignment(Alignment::Center)
+                .space_before(Length::pt(12.0));
+            para.add_run("[illustration]").font("Century Schoolbook").size(10.0).italic(true).color("AAAAAA");
+            pos += 1;
+        }
+        "overlay" => {
+            // Image area with text overlaid (text in a shaded box)
+            let mut para = doc.insert_paragraph(pos, "");
+            para = para.alignment(Alignment::Center)
+                .space_before(Length::pt(120.0))
+                .space_after(Length::pt(120.0))
+                .shading("F0F8FF");
+            para.add_run(text).font("Century Schoolbook").size(font_size).bold(true);
+            pos += 1;
+        }
+        _ => {
+            // "bottom" (default) — image area first, text at bottom
+            let mut para = doc.insert_paragraph(pos, "");
+            para = para.alignment(Alignment::Center)
+                .space_after(Length::pt(12.0));
+            para.add_run("[illustration]").font("Century Schoolbook").size(10.0).italic(true).color("AAAAAA");
+            pos += 1;
+            let mut para = doc.insert_paragraph(pos, "");
+            para = para.alignment(Alignment::Center)
+                .space_before(Length::pt(24.0));
+            para.add_run(text).font("Century Schoolbook").size(font_size);
+            pos += 1;
+        }
+    }
+
+    pos - index
+}
+
+/// Insert large emphasis text for children's books (sound effects, key words).
+pub fn insert_big_text(doc: &mut Document, index: usize, text: &str, size: f64, bold: bool) {
+    let mut para = doc.insert_paragraph(index, "");
+    para = para.alignment(Alignment::Center)
+        .space_before(Length::pt(12.0))
+        .space_after(Length::pt(12.0));
+    let mut run = para.add_run(text);
+    run = run.font("Century Schoolbook").size(size);
+    if bold { run.bold(true); }
+}
+
 // ── Syntax highlighting ──────────────────────────────────────────────────────
 
 struct SyntaxColors;

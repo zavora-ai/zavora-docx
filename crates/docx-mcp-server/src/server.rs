@@ -193,6 +193,52 @@ pub struct FigureCaptionInput {
     pub caption: String,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RecipeInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub prep_time: String,
+    pub cook_time: String,
+    pub servings: String,
+    pub ingredients: Vec<String>,
+    pub instructions: Vec<String>,
+    pub chef_tip: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SpreadInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub text: String,
+    /// "top", "bottom", or "overlay" (default: "bottom")
+    pub text_position: Option<String>,
+    /// Font size in pt (default: 18.0 for children's)
+    pub font_size: Option<f64>,
+    /// Start on new page (default: true)
+    pub page_break: Option<bool>,
+    /// Optional image path to insert
+    pub image_path: Option<String>,
+    /// Image width in inches (default: 7.0)
+    pub image_width: Option<f64>,
+    /// Image height in inches (default: 5.0)
+    pub image_height: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct BigTextInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub text: String,
+    /// Font size in pt (default: 28.0)
+    pub font_size: Option<f64>,
+    /// Bold (default: true)
+    pub bold: Option<bool>,
+    /// Font name (default: "Century Schoolbook")
+    pub font: Option<String>,
+}
+
 // ── Server ───────────────────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -227,6 +273,8 @@ impl DocxServer {
         match input.format.as_deref() {
             Some("kdp:technical" | "kdp") => engine::create_kdp_technical(&mut doc),
             Some("kdp:novel") => engine::create_kdp_novel(&mut doc),
+            Some("kdp:cookbook") => engine::create_kdp_cookbook(&mut doc),
+            Some("kdp:children") => engine::create_kdp_children(&mut doc),
             _ => {}
         }
         // Apply optional overrides
@@ -592,6 +640,50 @@ impl DocxServer {
             if let Some(h) = &input.header { doc.set_header(h); }
             if let Some(f) = &input.footer { doc.set_footer(f); }
             serde_json::json!({"set": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a complete recipe layout with title, prep info, ingredients, numbered instructions, and optional chef's tip. For KDP cookbooks.")]
+    async fn insert_recipe(&self, Parameters(input): Parameters<RecipeInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
+            let count = engine::insert_recipe(
+                doc, input.index, &input.title, input.subtitle.as_deref(),
+                &input.prep_time, &input.cook_time, &input.servings,
+                &input.ingredients, &input.instructions, input.chef_tip.as_deref(),
+            );
+            serde_json::json!({"elements_inserted": count}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a children's book spread: text with positioning (top/bottom/overlay). Use with add_image for illustrations. For KDP children's books.")]
+    async fn insert_spread(&self, Parameters(input): Parameters<SpreadInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
+            let count = engine::insert_spread(
+                doc, input.index, &input.text,
+                input.text_position.as_deref().unwrap_or("bottom"),
+                input.font_size.unwrap_or(18.0),
+                input.page_break.unwrap_or(true),
+            );
+            // If image provided, insert it
+            if let Some(ref img_path) = input.image_path {
+                if let Ok(img_data) = std::fs::read(img_path) {
+                    let ext = img_path.rsplit('.').next().unwrap_or("png");
+                    let w = rdocx::Length::inches(input.image_width.unwrap_or(7.0));
+                    let h = rdocx::Length::inches(input.image_height.unwrap_or(5.0));
+                    doc.add_picture(&img_data, &format!("spread.{}", ext), w, h);
+                }
+            }
+            serde_json::json!({"elements_inserted": count}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert large centered text for emphasis (sound effects, key words). For KDP children's books.")]
+    async fn insert_big_text(&self, Parameters(input): Parameters<BigTextInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
+            let size = input.font_size.unwrap_or(28.0);
+            let bold = input.bold.unwrap_or(true);
+            engine::insert_big_text(doc, input.index, &input.text, size, bold);
+            serde_json::json!({"inserted": true}).to_string()
         })
     }
 
