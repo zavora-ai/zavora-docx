@@ -47,7 +47,7 @@ pub fn create_kdp_technical(doc: &mut Document) {
         Length::inches(0.75),
         Length::inches(0.875),
     );
-    doc.set_footer("{{PAGE}}");
+    doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
 }
@@ -60,7 +60,7 @@ pub fn create_kdp_novel(doc: &mut Document) {
         Length::inches(0.75),
         Length::inches(0.875),
     );
-    doc.set_footer("{{PAGE}}");
+    doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
 }

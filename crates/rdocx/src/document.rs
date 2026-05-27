@@ -527,6 +527,41 @@ impl Document {
         self.set_header_footer_part(text, false, HdrFtrType::Default);
     }
 
+    /// Set a footer with a centered page number field.
+    pub fn set_footer_page_number(&mut self) {
+        use rdocx_opc::relationship::rel_types;
+        use rdocx_oxml::text::{CT_R, RunContent, FieldType};
+
+        let mut hdr_ftr = CT_HdrFtr::new();
+        let mut p = CT_P::new();
+
+        // Center alignment
+        let mut ppr = CT_PPr::default();
+        ppr.jc = Some(rdocx_oxml::shared::ST_Jc::Center);
+        p.properties = Some(ppr);
+
+        // Add a run with PAGE field
+        let mut run = CT_R::new("");
+        run.content = vec![RunContent::Field { field_type: FieldType::Page }];
+        p.runs.push(run);
+
+        hdr_ftr.paragraphs.push(p);
+
+        let part_name = "/word/footer1.xml";
+        let xml = hdr_ftr.to_xml_footer().expect("footer serialization failed");
+
+        self.package.set_part(part_name, xml);
+        self.package.content_types.add_override(part_name, "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml");
+
+        let rel_target = "footer1.xml";
+        let rels = self.package.get_or_create_part_rels(&self.doc_part_name);
+        let rel_id = rels.add(rel_types::FOOTER, rel_target);
+
+        let sect = self.section_properties_mut();
+        sect.footer_refs.retain(|r| r.hdr_ftr_type != HdrFtrType::Default);
+        sect.footer_refs.push(HdrFtrRef { hdr_ftr_type: HdrFtrType::Default, rel_id });
+    }
+
     /// Set the first-page header text.
     pub fn set_first_page_header(&mut self, text: &str) {
         self.set_different_first_page(true);
