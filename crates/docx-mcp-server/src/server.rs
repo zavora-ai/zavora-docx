@@ -106,6 +106,14 @@ pub struct CellInput {
     pub text: String,
     /// Which table (0-based index among all tables in document)
     pub table_index: Option<usize>,
+    /// Font name (default: "Garamond")
+    pub font: Option<String>,
+    /// Font size in pt (default: 10.0)
+    pub font_size: Option<f64>,
+    /// Bold text
+    pub bold: Option<bool>,
+    /// Text color hex (e.g., "FFFFFF" for white)
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -498,7 +506,7 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Set text in a table cell")]
+    #[tool(description = "Set text in a table cell with optional font, size, bold, color")]
     async fn set_table_cell(&self, Parameters(input): Parameters<CellInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut rdocx::Document| {
             let ti = input.table_index.unwrap_or(0);
@@ -506,8 +514,18 @@ impl DocxServer {
                 Some(mut table) => {
                     match table.cell(input.row, input.col) {
                         Some(mut cell) => {
-                            cell.set_text(&input.text);
-                            serde_json::json!({"set": true, "row": input.row, "col": input.col}).to_string()
+                            cell.remove_first_empty_paragraph();
+                            let mut para = cell.add_paragraph("");
+                            let mut run = para.add_run(&input.text);
+                            run = run.font(input.font.as_deref().unwrap_or("Garamond"))
+                                .size(input.font_size.unwrap_or(10.0));
+                            if input.bold.unwrap_or(false) {
+                                run = run.bold(true);
+                            }
+                            if let Some(ref color) = input.color {
+                                run.color(color);
+                            }
+                            serde_json::json!({"set": true}).to_string()
                         }
                         None => serde_json::json!({"error": format!("Cell ({},{}) not found", input.row, input.col)}).to_string(),
                     }
