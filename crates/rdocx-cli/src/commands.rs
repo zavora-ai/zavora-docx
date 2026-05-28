@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use rdocx::Document;
+use zavora_docx::Document;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

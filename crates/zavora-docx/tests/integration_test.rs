@@ -1,9 +1,9 @@
 //! Integration tests for rdocx — end-to-end document creation and round-trip.
 
-use rdocx::Document;
-use rdocx::paragraph::Alignment;
-use rdocx::table::VerticalAlignment;
-use rdocx::{
+use zavora_docx::Document;
+use zavora_docx::paragraph::Alignment;
+use zavora_docx::table::VerticalAlignment;
+use zavora_docx::{
     BorderStyle, Length, SectionBreak, StyleBuilder, TabAlignment, TabLeader, UnderlineStyle,
 };
 
@@ -885,7 +885,7 @@ fn nested_table_round_trip() {
 
 #[test]
 fn comprehensive_document_round_trip_with_nested() {
-    use rdocx::paragraph::Alignment;
+    use zavora_docx::paragraph::Alignment;
 
     let mut doc = Document::new();
 

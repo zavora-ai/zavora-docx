@@ -1,4 +1,4 @@
-use rdocx::Document;
+use zavora_docx::Document;
 
 fn main() {
     let doc = Document::open("samples/feature_showcase.docx").expect("Failed to open document");

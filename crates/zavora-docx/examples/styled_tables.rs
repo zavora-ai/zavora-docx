@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use rdocx::{BorderStyle, Document, Length, VerticalAlignment};
+use zavora_docx::{BorderStyle, Document, Length, VerticalAlignment};
 
 fn main() {
     let samples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))

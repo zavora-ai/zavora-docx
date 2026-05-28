@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use rdocx::{
+use zavora_docx::{
     Alignment, BorderStyle, Document, Length, SectionBreak, TabAlignment, TabLeader,
     VerticalAlignment,
 };

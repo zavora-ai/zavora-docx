@@ -5,7 +5,7 @@
 //! # Examples
 //!
 //! ```no_run
-//! use rdocx::Document;
+//! use zavora_docx::Document;
 //!
 //! // Create a new document
 //! let mut doc = Document::new();

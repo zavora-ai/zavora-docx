@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo run --example generate_pdf
 
-use rdocx::Document;
+use zavora_docx::Document;
 
 fn main() {
     // Test 1: Simple document

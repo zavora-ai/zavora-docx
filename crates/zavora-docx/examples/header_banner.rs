@@ -9,7 +9,7 @@
 use std::fmt::Write;
 use std::path::Path;
 
-use rdocx::{Document, Length};
+use zavora_docx::{Document, Length};
 
 fn main() {
     let samples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))

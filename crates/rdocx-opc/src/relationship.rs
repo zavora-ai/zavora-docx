@@ -191,6 +191,19 @@ impl Relationships {
         id
     }
 
+    /// Add an external relationship (e.g. hyperlink) and return its generated ID.
+    pub fn add_external(&mut self, rel_type: &str, target: &str) -> String {
+        let id = format!("rId{}", self.next_id);
+        self.next_id += 1;
+        self.items.push(Relationship {
+            id: id.clone(),
+            rel_type: rel_type.to_string(),
+            target: target.to_string(),
+            target_mode: Some("External".to_string()),
+        });
+        id
+    }
+
     /// Add a relationship with a specific ID.
     ///
     /// If a relationship with this ID already exists, it is replaced.

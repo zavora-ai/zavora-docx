@@ -1,5 +1,5 @@
 [package]
-name = "rdocx"
+name = "zavora-docx"
 description = "High-level API for reading, writing, and converting DOCX documents"
 version.workspace = true
 edition.workspace = true

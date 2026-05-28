@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 use std::path::Path;
 
-use rdocx::{
+use zavora_docx::{
     Alignment, BorderStyle, Document, Length, SectionBreak, StyleBuilder, TabAlignment, TabLeader,
     VerticalAlignment,
 };

@@ -32,6 +32,10 @@ pub struct Document {
     styles: CT_Styles,
     numbering: Option<CT_Numbering>,
     core_properties: Option<CoreProperties>,
+    footnotes: Option<rdocx_oxml::footnotes::CT_Footnotes>,
+    endnotes: Option<rdocx_oxml::footnotes::CT_Footnotes>,
+    comments_xml: Option<Vec<String>>,
+    protection_type: Option<String>,
     /// Part name for the main document
     doc_part_name: String,
     /// Cached count of image media parts (avoids rescanning parts on each embed).
@@ -56,6 +60,10 @@ impl Document {
             styles,
             numbering: None,
             core_properties: None,
+            footnotes: None,
+            endnotes: None,
+            comments_xml: None,
+            protection_type: None,
             doc_part_name: "/word/document.xml".to_string(),
             image_counter: 0,
         }
@@ -126,12 +134,31 @@ impl Document {
             .filter(|k| k.starts_with("/word/media/image"))
             .count();
 
+        // Try to load footnotes and endnotes
+        let footnotes = if let Some(rels) = package.get_part_rels(&doc_part_name) {
+            if let Some(rel) = rels.get_by_type(rel_types::FOOTNOTES) {
+                let part = OpcPackage::resolve_rel_target(&doc_part_name, &rel.target);
+                package.get_part(&part).and_then(|xml| rdocx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
+            } else { None }
+        } else { None };
+
+        let endnotes = if let Some(rels) = package.get_part_rels(&doc_part_name) {
+            if let Some(rel) = rels.get_by_type(rel_types::ENDNOTES) {
+                let part = OpcPackage::resolve_rel_target(&doc_part_name, &rel.target);
+                package.get_part(&part).and_then(|xml| rdocx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
+            } else { None }
+        } else { None };
+
         Ok(Document {
             package,
             document,
             styles,
             numbering,
             core_properties,
+            footnotes,
+            endnotes,
+            comments_xml: None,
+            protection_type: None,
             doc_part_name,
             image_counter,
         })
@@ -176,6 +203,57 @@ impl Document {
                 "/docProps/core.xml",
                 "application/vnd.openxmlformats-package.core-properties+xml",
             );
+        }
+
+        // Serialize footnotes.xml if we have footnotes
+        if let Some(ref footnotes) = self.footnotes {
+            let xml = footnotes.to_xml_footnotes()?;
+            self.package.set_part("/word/footnotes.xml", xml);
+            self.package.content_types.add_override(
+                "/word/footnotes.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml",
+            );
+        }
+
+        // Serialize endnotes.xml if we have endnotes
+        if let Some(ref endnotes) = self.endnotes {
+            let xml = endnotes.to_xml_endnotes()?;
+            self.package.set_part("/word/endnotes.xml", xml);
+            self.package.content_types.add_override(
+                "/word/endnotes.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml",
+            );
+        }
+
+        // Serialize comments.xml if we have comments
+        if let Some(ref comments) = self.comments_xml {
+            let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
+            for c in comments { xml.push_str(c); }
+            xml.push_str("</w:comments>");
+            self.package.set_part("/word/comments.xml", xml.into_bytes());
+            self.package.content_types.add_override(
+                "/word/comments.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
+            );
+        }
+
+        // Serialize settings.xml if we have protection
+        if let Some(ref prot) = self.protection_type {
+            let xml = format!(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:documentProtection w:edit="{}" w:enforcement="1"/></w:settings>"#,
+                prot
+            );
+            self.package.set_part("/word/settings.xml", xml.into_bytes());
+            self.package.content_types.add_override(
+                "/word/settings.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+            );
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+                    "settings.xml",
+                );
         }
 
         Ok(())
@@ -1362,6 +1440,152 @@ impl Document {
     fn ensure_core_properties(&mut self) -> &mut CoreProperties {
         self.core_properties
             .get_or_insert_with(CoreProperties::default)
+    }
+
+    // ---- Footnotes & Endnotes ----
+
+    /// Create a hyperlink relationship for an external URL. Returns the relationship ID.
+    /// Use the returned ID with `paragraph.add_hyperlink_run(text, Some(&rel_id), None)`.
+    pub fn add_hyperlink_rel(&mut self, url: &str) -> String {
+        self.package
+            .get_or_create_part_rels(&self.doc_part_name)
+            .add_external(rdocx_opc::relationship::rel_types::HYPERLINK, url)
+    }
+
+    /// Add a comment to the document. Returns the comment ID.
+    /// Use the ID with `paragraph.comment_start(id)` and `paragraph.comment_end(id)` to mark the commented range.
+    pub fn add_comment(&mut self, id: u32, author: &str, text: &str) {
+        // Build comment XML and append to comments part
+        let comment_xml = format!(
+            r#"<w:comment w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>{}</w:t></w:r></w:p></w:comment>"#,
+            id, author, text
+        );
+        let comments = self.comments_xml.get_or_insert_with(|| {
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+                    "comments.xml",
+                );
+            Vec::new()
+        });
+        comments.push(comment_xml);
+    }
+
+    /// Set a diagonal text watermark (e.g. "DRAFT", "CONFIDENTIAL") on every page.
+    pub fn set_text_watermark(&mut self, text: &str, color: &str, rotation: Option<i32>) {
+        let rot = rotation.unwrap_or(-45);
+        let mut xml = String::new();
+        xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+        xml.push_str("<w:hdr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:v=\"urn:schemas-microsoft-com:vml\" xmlns:o=\"urn:schemas-microsoft-com:office:office\" xmlns:w10=\"urn:schemas-microsoft-com:office:word\">");
+        xml.push_str("<w:p><w:r><w:pict>");
+        xml.push_str("<v:shapetype id=\"_x0000_t136\" coordsize=\"21600,21600\" o:spt=\"136\" path=\"m,l21600,r,21600l21600,21600e\"/>");
+        xml.push_str("<v:shape id=\"PowerPlusWaterMarkObject\" type=\"#_x0000_t136\" style=\"position:absolute;margin-left:0;margin-top:0;width:527.85pt;height:131.95pt;rotation:");
+        xml.push_str(&rot.to_string());
+        xml.push_str(";z-index:-251658752;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin\" o:allowincell=\"f\" fillcolor=\"#");
+        xml.push_str(color);
+        xml.push_str("\" stroked=\"f\"><v:fill opacity=\".5\"/><v:textpath style=\"font-family:&quot;Calibri&quot;;font-size:1pt\" string=\"");
+        xml.push_str(text);
+        xml.push_str("\"/><w10:wrap anchorx=\"margin\" anchory=\"margin\"/></v:shape>");
+        xml.push_str("</w:pict></w:r></w:p></w:hdr>");
+
+        let rel_id = self.package
+            .get_or_create_part_rels(&self.doc_part_name)
+            .add(rdocx_opc::relationship::rel_types::HEADER, "header_watermark.xml");
+        self.package.set_part("/word/header_watermark.xml", xml.into_bytes());
+        self.package.content_types.add_override(
+            "/word/header_watermark.xml",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+        );
+
+        let sect_pr = self.section_properties_mut();
+        use rdocx_oxml::header_footer::{HdrFtrRef, HdrFtrType};
+        sect_pr.header_refs.retain(|h| h.hdr_ftr_type != HdrFtrType::Default);
+        sect_pr.header_refs.push(HdrFtrRef {
+            hdr_ftr_type: HdrFtrType::Default,
+            rel_id,
+        });
+    }
+
+    /// Add a footnote with the given text. Returns the footnote ID.
+    /// Use the returned ID with `Run::footnote_ref(id)` to insert the reference in body text.
+    pub fn add_footnote(&mut self, text: &str) -> i32 {
+        let footnotes = self.footnotes.get_or_insert_with(|| {
+            // Ensure relationship exists
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add(rdocx_opc::relationship::rel_types::FOOTNOTES, "footnotes.xml");
+            rdocx_oxml::footnotes::CT_Footnotes::new()
+        });
+        let id = footnotes.footnotes.iter().map(|f| f.id).max().unwrap_or(0) + 1;
+        let mut para = rdocx_oxml::text::CT_P::new();
+        para.add_run(text);
+        footnotes.footnotes.push(rdocx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
+        id
+    }
+
+    /// Add an endnote with the given text. Returns the endnote ID.
+    pub fn add_endnote(&mut self, text: &str) -> i32 {
+        let endnotes = self.endnotes.get_or_insert_with(|| {
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add(rdocx_opc::relationship::rel_types::ENDNOTES, "endnotes.xml");
+            rdocx_oxml::footnotes::CT_Footnotes::new()
+        });
+        let id = endnotes.footnotes.iter().map(|f| f.id).max().unwrap_or(0) + 1;
+        let mut para = rdocx_oxml::text::CT_P::new();
+        para.add_run(text);
+        endnotes.footnotes.push(rdocx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
+        id
+    }
+
+    /// Get all footnotes as (id, text) pairs.
+    pub fn footnotes_list(&self) -> Vec<(i32, String)> {
+        self.footnotes.as_ref().map(|fns| {
+            fns.footnotes.iter().map(|f| {
+                let text = f.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>().join("\n");
+                (f.id, text)
+            }).collect()
+        }).unwrap_or_default()
+    }
+
+    /// Get all endnotes as (id, text) pairs.
+    pub fn endnotes_list(&self) -> Vec<(i32, String)> {
+        self.endnotes.as_ref().map(|ens| {
+            ens.footnotes.iter().map(|f| {
+                let text = f.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>().join("\n");
+                (f.id, text)
+            }).collect()
+        }).unwrap_or_default()
+    }
+
+    /// Protect the document as read-only.
+    pub fn protect_readonly(&mut self) {
+        self.set_protection("readOnly");
+    }
+
+    /// Protect the document so only form fields are editable.
+    pub fn protect_forms_only(&mut self) {
+        self.set_protection("forms");
+    }
+
+    /// Protect the document so only comments can be added.
+    pub fn protect_comments_only(&mut self) {
+        self.set_protection("comments");
+    }
+
+    /// Protect the document so only tracked changes are allowed.
+    pub fn protect_tracked_changes_only(&mut self) {
+        self.set_protection("trackedChanges");
+    }
+
+    /// Remove document protection.
+    pub fn unprotect(&mut self) {
+        self.protection_type = None;
+    }
+
+    fn set_protection(&mut self, edit_type: &str) {
+        self.protection_type = Some(edit_type.to_string());
     }
 
     // ---- Document Merging ----

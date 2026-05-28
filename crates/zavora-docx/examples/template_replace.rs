@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use rdocx::{Alignment, BorderStyle, Document, Length};
+use zavora_docx::{Alignment, BorderStyle, Document, Length};
 
 fn main() {
     let samples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))

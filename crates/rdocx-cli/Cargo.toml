@@ -16,7 +16,7 @@ name = "rdocx"
 path = "src/main.rs"
 
 [dependencies]
-rdocx = { workspace = true }
+zavora-docx = { workspace = true }
 rdocx-oxml = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"

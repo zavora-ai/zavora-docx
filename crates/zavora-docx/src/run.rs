@@ -193,6 +193,20 @@ impl<'a> Run<'a> {
         self
     }
 
+    /// Insert a footnote reference (superscript number linking to footnote).
+    pub fn footnote_ref(mut self, id: i32) -> Self {
+        self.inner.content.push(RunContent::FootnoteRef { id });
+        self.ensure_rpr().vert_align = Some("superscript".to_string());
+        self
+    }
+
+    /// Insert an endnote reference (superscript number linking to endnote).
+    pub fn endnote_ref(mut self, id: i32) -> Self {
+        self.inner.content.push(RunContent::EndnoteRef { id });
+        self.ensure_rpr().vert_align = Some("superscript".to_string());
+        self
+    }
+
     fn ensure_rpr(&mut self) -> &mut CT_RPr {
         self.inner.properties.get_or_insert_with(CT_RPr::default)
     }

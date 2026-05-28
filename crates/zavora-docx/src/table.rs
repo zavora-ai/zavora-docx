@@ -125,6 +125,17 @@ impl<'a> Table<'a> {
         self.inner.rows.len()
     }
 
+    /// Add a new row with the given number of cells and return a mutable reference.
+    pub fn add_row(&mut self, cols: usize) -> Row<'_> {
+        use rdocx_oxml::table::{CT_Row, CT_Tc};
+        let mut row = CT_Row::new();
+        for _ in 0..cols {
+            row.cells.push(CT_Tc::new());
+        }
+        self.inner.rows.push(row);
+        Row { inner: self.inner.rows.last_mut().unwrap() }
+    }
+
     /// Get a mutable reference to a row by index.
     pub fn row(&mut self, index: usize) -> Option<Row<'_>> {
         self.inner.rows.get_mut(index).map(|r| Row { inner: r })

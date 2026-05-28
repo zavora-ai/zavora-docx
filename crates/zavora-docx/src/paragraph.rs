@@ -133,6 +133,139 @@ impl<'a> Paragraph<'a> {
         }
     }
 
+    /// Add a hyperlink run. The `rel_id` should be obtained from `Document::add_hyperlink_rel()`.
+    /// For internal links, pass `None` for rel_id and `Some(bookmark)` for anchor.
+    pub fn add_hyperlink_run(&mut self, text: &str, rel_id: Option<&str>, anchor: Option<&str>) -> Run<'_> {
+        let run_start = self.inner.runs.len();
+        self.inner.runs.push(CT_R::new(text));
+        let run_end = self.inner.runs.len();
+        self.inner.hyperlinks.push(rdocx_oxml::text::HyperlinkSpan {
+            rel_id: rel_id.map(|s| s.to_string()),
+            anchor: anchor.map(|s| s.to_string()),
+            run_start,
+            run_end,
+        });
+        Run {
+            inner: self.inner.runs.last_mut().unwrap(),
+        }
+    }
+
+    /// Add a bookmark at this paragraph. The bookmark wraps all content in the paragraph.
+    /// Use `id` as a unique integer and `name` as the bookmark name for cross-references.
+    pub fn bookmark(&mut self, id: u32, name: &str) {
+        let start = format!(
+            r#"<w:bookmarkStart w:id="{}" w:name="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            id, name
+        );
+        let end = format!(
+            r#"<w:bookmarkEnd w:id="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            id
+        );
+        // bookmarkStart before all runs, bookmarkEnd after all runs
+        self.inner.extra_xml.push((0, start.into_bytes()));
+        let pos = self.inner.runs.len();
+        self.inner.extra_xml.push((pos, end.into_bytes()));
+    }
+
+    /// Mark the start of a comment range. Place before the commented text runs.
+    pub fn comment_start(&mut self, id: u32) {
+        let xml = format!(
+            r#"<w:commentRangeStart w:id="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            id
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+    }
+
+    /// Mark the end of a comment range and insert the comment reference. Place after the commented text runs.
+    pub fn comment_end(&mut self, id: u32) {
+        let end_xml = format!(
+            r#"<w:commentRangeEnd w:id="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            id
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), end_xml.into_bytes()));
+        // Add a run with commentReference
+        let ref_xml = format!(
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="{}"/></w:r>"#,
+            id
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), ref_xml.into_bytes()));
+    }
+
+    /// Add a tracked insertion (text shown as added in review mode).
+    pub fn add_tracked_insert(&mut self, text: &str, author: &str) {
+        let xml = format!(
+            r#"<w:ins w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>{}</w:t></w:r></w:ins>"#,
+            self.inner.runs.len() + 100, author, text
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+    }
+
+    /// Add a tracked deletion (text shown as strikethrough in review mode).
+    pub fn add_tracked_delete(&mut self, text: &str, author: &str) {
+        let xml = format!(
+            r#"<w:del w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:strike/><w:color w:val="FF0000"/></w:rPr><w:delText>{}</w:delText></w:r></w:del>"#,
+            self.inner.runs.len() + 200, author, text
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+    }
+
+    /// Add a text input form field.
+    pub fn add_text_field(&mut self, name: &str, default_value: &str) {
+        let xml = format!(
+            concat!(
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="begin"><w:ffData>"#,
+                r#"<w:name w:val="{}"/><w:enabled/><w:calcOnExit w:val="0"/>"#,
+                r#"<w:textInput><w:default w:val="{}"/></w:textInput>"#,
+                r#"</w:ffData></w:fldChar></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:instrText> FORMTEXT </w:instrText></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="separate"/></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t>{}</w:t></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="end"/></w:r>"#,
+            ),
+            name, default_value, default_value
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+    }
+
+    /// Add a checkbox form field.
+    pub fn add_checkbox(&mut self, name: &str, checked: bool) {
+        let check_val = if checked { "1" } else { "0" };
+        let xml = format!(
+            concat!(
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="begin"><w:ffData>"#,
+                r#"<w:name w:val="{}"/><w:enabled/><w:calcOnExit w:val="0"/>"#,
+                r#"<w:checkBox><w:sizeAuto/><w:default w:val="{}"/></w:checkBox>"#,
+                r#"</w:ffData></w:fldChar></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:instrText> FORMCHECKBOX </w:instrText></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="separate"/></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="end"/></w:r>"#,
+            ),
+            name, check_val
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+    }
+
+    /// Add a dropdown form field.
+    pub fn add_dropdown(&mut self, name: &str, options: &[&str], selected: usize) {
+        let mut entries = String::new();
+        for opt in options {
+            entries.push_str(&format!(r#"<w:listEntry w:val="{}"/>"#, opt));
+        }
+        let xml = format!(
+            concat!(
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="begin"><w:ffData>"#,
+                r#"<w:name w:val="{}"/><w:enabled/><w:calcOnExit w:val="0"/>"#,
+                r#"<w:ddList><w:result w:val="{}"/>{}</w:ddList>"#,
+                r#"</w:ffData></w:fldChar></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:instrText> FORMDROPDOWN </w:instrText></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="separate"/></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="end"/></w:r>"#,
+            ),
+            name, selected, entries
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+    }
+
     /// Get an iterator over immutable run references.
     pub fn runs(&self) -> impl Iterator<Item = RunRef<'_>> {
         self.inner.runs.iter().map(|r| RunRef { inner: r })
