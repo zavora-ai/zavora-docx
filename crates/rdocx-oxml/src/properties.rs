@@ -110,6 +110,10 @@ pub struct CT_PPr {
     pub num_id: Option<u32>,
     /// Section properties embedded in paragraph (section break)
     pub sect_pr: Option<CT_SectPr>,
+    /// Drop cap: number of lines to span (2-4 typical). Generates w:framePr.
+    pub drop_cap_lines: Option<u32>,
+    /// Extra raw XML elements to include in pPr serialization.
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -374,6 +378,24 @@ impl CT_PPr {
             sect.to_xml(writer)?;
         }
 
+        // Drop cap via framePr
+        if let Some(lines) = self.drop_cap_lines {
+            let mut e = BytesStart::new("w:framePr");
+            e.push_attribute(("w:dropCap", "drop"));
+            e.push_attribute(("w:lines", buf.format(lines)));
+            e.push_attribute(("w:wrap", "around"));
+            e.push_attribute(("w:vAnchor", "text"));
+            e.push_attribute(("w:hAnchor", "text"));
+            writer.write_event(Event::Empty(e))?;
+        }
+
+        // Extra raw XML
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
+        }
+
         writer.write_event(Event::End(BytesEnd::new("w:pPr")))?;
         Ok(())
     }
@@ -403,6 +425,8 @@ impl CT_PPr {
             && self.num_id.is_none()
             && self.num_ilvl.is_none()
             && self.sect_pr.is_none()
+            && self.drop_cap_lines.is_none()
+            && self.extra_xml.is_none()
     }
 
     /// Merge another CT_PPr into this one (non-None fields override).
@@ -538,6 +562,12 @@ pub struct CT_RPr {
     pub shading: Option<CT_Shd>,
     /// Vanish/hidden text (vanish)
     pub vanish: Option<bool>,
+    /// Kerning threshold in half-points (kern/@w:val). Text above this size gets kerned.
+    pub kern: Option<u32>,
+    /// Ligatures (w14:ligatures/@w14:val): "none", "standard", "all", etc.
+    pub ligatures: Option<String>,
+    /// Extra raw XML for w14 effects (shadow, glow, outline, reflection, textFill)
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -782,6 +812,24 @@ impl CT_RPr {
             shd.write_xml(writer, "w:shd")?;
         }
 
+        if let Some(kern) = self.kern {
+            let mut e = BytesStart::new("w:kern");
+            e.push_attribute(("w:val", buf.format(kern)));
+            writer.write_event(Event::Empty(e))?;
+        }
+
+        if let Some(ref lig) = self.ligatures {
+            let mut e = BytesStart::new("w14:ligatures");
+            e.push_attribute(("w14:val", lig.as_str()));
+            writer.write_event(Event::Empty(e))?;
+        }
+
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
+        }
+
         writer.write_event(Event::End(BytesEnd::new("w:rPr")))?;
         Ok(())
     }
@@ -814,6 +862,9 @@ impl CT_RPr {
             && self.position.is_none()
             && self.shading.is_none()
             && self.vanish.is_none()
+            && self.kern.is_none()
+            && self.ligatures.is_none()
+            && self.extra_xml.is_none()
     }
 
     /// Merge another CT_RPr into this one (non-None fields override).

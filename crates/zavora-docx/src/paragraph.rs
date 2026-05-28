@@ -152,6 +152,14 @@ impl<'a> Paragraph<'a> {
 
     /// Add a bookmark at this paragraph. The bookmark wraps all content in the paragraph.
     /// Use `id` as a unique integer and `name` as the bookmark name for cross-references.
+
+    /// Make this paragraph a drop cap (large first letter spanning multiple lines).
+    /// `lines` is how many lines the drop cap spans (typically 2-4).
+    pub fn drop_cap(mut self, lines: u32) -> Self {
+        self.ensure_ppr().drop_cap_lines = Some(lines);
+        self
+    }
+
     pub fn bookmark(&mut self, id: u32, name: &str) {
         let start = format!(
             r#"<w:bookmarkStart w:id="{}" w:name="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,

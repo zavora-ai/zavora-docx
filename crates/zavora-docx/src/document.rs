@@ -1270,6 +1270,53 @@ impl Document {
         }
     }
 
+    /// Add a list item with custom numbering format.
+    /// `format`: "decimal", "upperRoman", "lowerRoman", "upperLetter", "lowerLetter", "bullet".
+    /// `bullet_char`: custom bullet character (only used when format is "bullet"), e.g. "→", "★", "◆".
+    pub fn add_custom_list_item(&mut self, text: &str, level: u32, format: &str, bullet_char: Option<&str>) -> Paragraph<'_> {
+        use rdocx_oxml::numbering::ST_NumberFormat;
+        let fmt = match format {
+            "upperRoman" => ST_NumberFormat::UpperRoman,
+            "lowerRoman" => ST_NumberFormat::LowerRoman,
+            "upperLetter" => ST_NumberFormat::UpperLetter,
+            "lowerLetter" => ST_NumberFormat::LowerLetter,
+            "bullet" => ST_NumberFormat::Bullet,
+            _ => ST_NumberFormat::Decimal,
+        };
+        let num_id = {
+            let numbering = self.ensure_numbering();
+            let abs_id = numbering.next_abstract_num_id();
+            let mut abs = rdocx_oxml::numbering::CT_AbstractNum::new(abs_id);
+            let mut lvl = rdocx_oxml::numbering::CT_Lvl::new(0);
+            lvl.num_fmt = Some(fmt);
+            lvl.start = Some(1);
+            lvl.lvl_text = if let Some(ch) = bullet_char {
+                Some(ch.to_string())
+            } else {
+                match fmt {
+                    ST_NumberFormat::Bullet => Some("\u{2022}".to_string()),
+                    _ => Some("%1.".to_string()),
+                }
+            };
+            abs.levels.push(lvl);
+            numbering.abstract_nums.push(abs);
+            let nid = numbering.next_num_id();
+            numbering.nums.push(rdocx_oxml::numbering::CT_Num { num_id: nid, abstract_num_id: abs_id });
+            nid
+        };
+
+        let mut p = rdocx_oxml::text::CT_P::new();
+        if !text.is_empty() { p.add_run(text); }
+        p.properties = Some(rdocx_oxml::properties::CT_PPr {
+            num_id: Some(num_id), num_ilvl: Some(level), ..Default::default()
+        });
+        self.document.body.content.push(rdocx_oxml::document::BodyContent::Paragraph(p));
+        match self.document.body.content.last_mut().unwrap() {
+            rdocx_oxml::document::BodyContent::Paragraph(p) => crate::paragraph::Paragraph { inner: p },
+            _ => unreachable!(),
+        }
+    }
+
     // ---- Style access ----
 
     /// Get all styles.
@@ -1586,6 +1633,37 @@ impl Document {
 
     fn set_protection(&mut self, edit_type: &str) {
         self.protection_type = Some(edit_type.to_string());
+    }
+
+    /// Enable line numbering in the document.
+    /// `count_by` = show every Nth number (1 = every line, 5 = every 5th).
+    /// `restart` = "continuous", "newPage", or "newSection".
+    pub fn set_line_numbering(&mut self, count_by: u32, restart: &str) {
+        let xml = format!(
+            r#"<w:lnNumType w:countBy="{}" w:restart="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            count_by, restart
+        );
+        self.section_properties_mut().extra_xml.push(xml.into_bytes());
+    }
+
+    /// Set the document theme colors and fonts. Creates/replaces word/theme/theme1.xml.
+    pub fn set_theme(&mut self, colors: &[(&str, &str)], major_font: &str, minor_font: &str) {
+        let mut color_xml = String::new();
+        for (name, hex) in colors {
+            color_xml.push_str(&format!(r#"<a:{} lastClr="{}"><a:srgbClr val="{}"/></a:{}>"#, name, hex, hex, name));
+        }
+        let xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Custom Theme"><a:themeElements><a:clrScheme name="Custom">{}</a:clrScheme><a:fontScheme name="Custom"><a:majorFont><a:latin typeface="{}"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="{}"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Custom"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>"#,
+            color_xml, major_font, minor_font
+        );
+        self.package.set_part("/word/theme/theme1.xml", xml.into_bytes());
+        self.package.content_types.add_override(
+            "/word/theme/theme1.xml",
+            "application/vnd.openxmlformats-officedocument.theme+xml",
+        );
+        self.package
+            .get_or_create_part_rels(&self.doc_part_name)
+            .add("http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme", "theme/theme1.xml");
     }
 
     // ---- Document Merging ----

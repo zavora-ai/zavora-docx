@@ -125,6 +125,43 @@ impl<'a> Table<'a> {
         self.inner.rows.len()
     }
 
+    /// Apply alternating row shading (banded rows). Even-indexed rows get the color.
+    pub fn banded_rows(&mut self, band_color: &str) {
+        for i in 0..self.inner.rows.len() {
+            if i % 2 == 1 {
+                for cell in &mut self.inner.rows[i].cells {
+                    let pr = cell.properties.get_or_insert_with(Default::default);
+                    pr.shading = Some(rdocx_oxml::properties::CT_Shd {
+                        val: "clear".to_string(),
+                        color: Some("auto".to_string()),
+                        fill: Some(band_color.to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    /// Style the first row as a header (bold white text on colored background, repeats on pages).
+    pub fn header_row_style(&mut self, bg_color: &str, text_color: &str) {
+        if let Some(row) = self.inner.rows.first_mut() {
+            row.properties.get_or_insert_with(Default::default).header = Some(true);
+            for cell in &mut row.cells {
+                cell.properties.get_or_insert_with(Default::default).shading = Some(rdocx_oxml::properties::CT_Shd {
+                    val: "clear".to_string(), color: Some("auto".to_string()), fill: Some(bg_color.to_string()),
+                });
+                for content in &mut cell.content {
+                    if let rdocx_oxml::table::CellContent::Paragraph(p) = content {
+                        for run in &mut p.runs {
+                            let rpr = run.properties.get_or_insert_with(Default::default);
+                            rpr.bold = Some(true);
+                            rpr.color = Some(text_color.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Add a new row with the given number of cells and return a mutable reference.
     pub fn add_row(&mut self, cols: usize) -> Row<'_> {
         use rdocx_oxml::table::{CT_Row, CT_Tc};
