@@ -770,6 +770,10 @@ impl CT_Document {
             doc_start.push_attribute((key.as_str(), val.as_str()));
         }
 
+        // Always add w14 namespace for text effects and mc:Ignorable for compatibility
+        doc_start.push_attribute(("xmlns:w14", "http://schemas.microsoft.com/office/word/2010/wordml"));
+        doc_start.push_attribute(("mc:Ignorable", "w14"));
+
         writer.write_event(Event::Start(doc_start))?;
 
         // Write background element if present

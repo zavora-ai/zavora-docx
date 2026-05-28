@@ -754,9 +754,13 @@ impl CT_RPr {
             write_toggle(writer, "w:dstrike", dstrike)?;
         }
 
-        if let Some(ref color) = self.color {
+        if self.color.is_some() || self.color_theme.is_some() {
             let mut e = BytesStart::new("w:color");
-            e.push_attribute(("w:val", color.as_str()));
+            if let Some(ref color) = self.color {
+                e.push_attribute(("w:val", color.as_str()));
+            } else {
+                e.push_attribute(("w:val", "000000"));
+            }
             if let Some(ref tc) = self.color_theme {
                 e.push_attribute(("w:themeColor", tc.as_str()));
             }
