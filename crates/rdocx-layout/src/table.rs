@@ -319,6 +319,7 @@ fn layout_cell_content(
                     }
                 }
             }
+            CellContent::RawXml(_) => {}
         }
     }
     Ok(blocks)

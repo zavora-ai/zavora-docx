@@ -1431,7 +1431,7 @@ impl Document {
             abs.levels.push(lvl);
             numbering.abstract_nums.push(abs);
             let nid = numbering.next_num_id();
-            numbering.nums.push(rdocx_oxml::numbering::CT_Num { num_id: nid, abstract_num_id: abs_id });
+            numbering.nums.push(rdocx_oxml::numbering::CT_Num { num_id: nid, abstract_num_id: abs_id, extra_xml: Vec::new() });
             nid
         };
 
@@ -1892,6 +1892,7 @@ impl Document {
             .get_or_insert_with(|| rdocx_oxml::numbering::CT_Numbering {
                 abstract_nums: Vec::new(),
                 nums: Vec::new(),
+                extra_xml: Vec::new(),
             });
 
         // Find max existing IDs to avoid collision
@@ -1962,6 +1963,7 @@ impl Document {
                         rdocx_oxml::table::CellContent::Table(nested) => {
                             Self::remap_table_num_ids(nested, offset);
                         }
+                        rdocx_oxml::table::CellContent::RawXml(_) => {}
                     }
                 }
             }
@@ -2783,6 +2785,7 @@ impl Document {
                                         result,
                                     );
                                 }
+                                rdocx_oxml::table::CellContent::RawXml(_) => {}
                             }
                         }
                     }
@@ -2863,6 +2866,7 @@ impl Document {
                                         nested.clone(),
                                     ));
                                 }
+                                rdocx_oxml::table::CellContent::RawXml(_) => {}
                             }
                         }
                     }

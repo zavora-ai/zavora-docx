@@ -296,9 +296,9 @@ mod tests {
     fn test_styles() -> CT_Styles {
         let mut styles = CT_Styles::new_default();
         styles.styles.push(CT_Style {
-            style_id: "Heading2".to_string(),
+            style_id: "MyHeading2".to_string(),
             style_type: StyleType::Paragraph,
-            name: Some("heading 2".to_string()),
+            name: Some("my heading 2".to_string()),
             based_on: Some("Heading1".to_string()),
             next_style: Some("Normal".to_string()),
             is_default: false,
@@ -311,6 +311,7 @@ mod tests {
                 color: Some("2E74B5".to_string()),
                 ..Default::default()
             }),
+            extra_xml: None,
         });
         styles
     }
@@ -334,7 +335,7 @@ mod tests {
     #[test]
     fn resolve_heading2_inherits_heading1() {
         let styles = test_styles();
-        let ppr = resolve_paragraph_properties(Some("Heading2"), &styles);
+        let ppr = resolve_paragraph_properties(Some("MyHeading2"), &styles);
         assert_eq!(ppr.keep_next, Some(true));
         assert_eq!(ppr.space_before, Some(Twips(40)));
     }
@@ -342,8 +343,8 @@ mod tests {
     #[test]
     fn resolve_heading2_rpr() {
         let styles = test_styles();
-        let rpr = resolve_run_properties(Some("Heading2"), None, &styles);
-        assert_eq!(rpr.font_ascii, Some("Calibri".to_string()));
+        let rpr = resolve_run_properties(Some("MyHeading2"), None, &styles);
+        assert_eq!(rpr.font_ascii_theme, Some("majorHAnsi".to_string()));
         assert_eq!(rpr.sz, Some(HalfPoint(26)));
         assert_eq!(rpr.bold, Some(true));
         assert_eq!(rpr.color, Some("2E74B5".to_string()));

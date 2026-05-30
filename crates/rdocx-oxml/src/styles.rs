@@ -2,6 +2,7 @@
 
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, Event};
 use quick_xml::{Reader, Writer};
+use std::io::Write;
 
 use crate::error::{OxmlError, Result};
 use crate::namespace::{W_NS, matches_local_name};
@@ -299,6 +300,8 @@ impl CT_DocDefaults {
 pub struct CT_Styles {
     pub doc_defaults: Option<CT_DocDefaults>,
     pub styles: Vec<CT_Style>,
+    /// Unknown top-level children preserved for round-trip (latentStyles, …).
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -307,6 +310,7 @@ impl CT_Styles {
         CT_Styles {
             doc_defaults: None,
             styles: Vec::new(),
+            extra_xml: None,
         }
     }
 
@@ -317,6 +321,7 @@ impl CT_Styles {
 
         let mut doc_defaults = None;
         let mut styles = Vec::new();
+        let mut extra_xml: Option<Vec<Vec<u8>>> = None;
         let mut buf = Vec::new();
 
         loop {
@@ -330,7 +335,17 @@ impl CT_Styles {
                     } else if matches_local_name(name.as_ref(), b"styles") {
                         // Root element, continue
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_element(&mut reader, e)?);
+                    }
+                }
+                Ok(Event::Empty(ref e)) => {
+                    let name = e.name();
+                    if !matches_local_name(name.as_ref(), b"styles") {
+                        extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::Eof) => break,
@@ -343,6 +358,7 @@ impl CT_Styles {
         Ok(CT_Styles {
             doc_defaults,
             styles,
+            extra_xml,
         })
     }
 
@@ -366,6 +382,12 @@ impl CT_Styles {
 
         if let Some(ref defaults) = self.doc_defaults {
             defaults.to_xml(&mut writer)?;
+        }
+
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
         }
 
         for style in &self.styles {
@@ -531,6 +553,7 @@ impl CT_Styles {
         CT_Styles {
             doc_defaults: Some(doc_defaults),
             styles: vec![normal, title, subtitle, h1, h2, h3, h4, h5, h6, quote, intense_quote, list_paragraph, caption],
+            extra_xml: None,
         }
     }
 }
@@ -583,11 +606,12 @@ mod tests {
     #[test]
     fn style_preserves_unknown_children() {
         // uiPriority/qFormat (empty) and a link are common style children we don't model.
-        let xml = br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:uiPriority w:val="29"/><w:qFormat/><w:link w:val="QuoteChar"/></w:style></w:styles>"#;
+        let xml = br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:latentStyles w:defLockedState="0"><w:lsdException w:name="Normal"/></w:latentStyles><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:uiPriority w:val="29"/><w:qFormat/><w:link w:val="QuoteChar"/></w:style></w:styles>"#;
         let parsed = CT_Styles::from_xml(xml).unwrap();
         let out = String::from_utf8(parsed.to_xml().unwrap()).unwrap();
         assert!(out.contains("w:uiPriority"), "uiPriority lost: {out}");
         assert!(out.contains("w:qFormat"), "qFormat lost: {out}");
         assert!(out.contains(r#"w:val="QuoteChar""#), "link lost: {out}");
+        assert!(out.contains("w:latentStyles"), "latentStyles lost: {out}");
     }
 }

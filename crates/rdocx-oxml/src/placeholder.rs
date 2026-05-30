@@ -234,6 +234,7 @@ pub fn replace_in_table(table: &mut CT_Tbl, placeholder: &str, replacement: &str
                     CellContent::Table(nested) => {
                         count += replace_in_table(nested, placeholder, replacement);
                     }
+                    CellContent::RawXml(_) => {}
                 }
             }
         }
@@ -555,6 +556,7 @@ pub fn replace_regex_in_table(table: &mut CT_Tbl, re: &regex::Regex, replacement
                     CellContent::Table(nested) => {
                         count += replace_regex_in_table(nested, re, replacement);
                     }
+                    CellContent::RawXml(_) => {}
                 }
             }
         }

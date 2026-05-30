@@ -315,6 +315,7 @@ fn collect_cell_text(
             CellContent::Table(_) => {
                 parts.push("(nested table)".to_string());
             }
+            CellContent::RawXml(_) => {}
         }
     }
 

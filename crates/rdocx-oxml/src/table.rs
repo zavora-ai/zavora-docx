@@ -807,6 +807,8 @@ pub enum CellContent {
     Paragraph(CT_P),
     /// A nested table.
     Table(CT_Tbl),
+    /// Raw XML for unknown cell content (SDTs, bookmarks, …) preserved verbatim.
+    RawXml(Vec<u8>),
 }
 
 /// `CT_Tc` — A table cell containing paragraphs and possibly nested tables.
@@ -834,6 +836,7 @@ impl CT_Tc {
             .filter_map(|c| match c {
                 CellContent::Paragraph(p) => Some(p),
                 CellContent::Table(_) => None,
+                CellContent::RawXml(_) => None,
             })
             .collect()
     }
@@ -845,6 +848,7 @@ impl CT_Tc {
             .filter_map(|c| match c {
                 CellContent::Paragraph(p) => Some(p),
                 CellContent::Table(_) => None,
+                CellContent::RawXml(_) => None,
             })
             .collect()
     }
@@ -873,7 +877,17 @@ impl CT_Tc {
                     } else if matches_local_name(name.as_ref(), b"tbl") {
                         content.push(CellContent::Table(CT_Tbl::from_xml(reader)?));
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        content.push(CellContent::RawXml(crate::raw_xml::capture_element(
+                            reader, e,
+                        )?));
+                    }
+                }
+                Ok(Event::Empty(ref e)) => {
+                    let name = e.name();
+                    if !matches_local_name(name.as_ref(), b"tcPr") {
+                        content.push(CellContent::RawXml(crate::raw_xml::capture_empty_element(
+                            e,
+                        )?));
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"tc") => {
@@ -903,6 +917,7 @@ impl CT_Tc {
             match item {
                 CellContent::Paragraph(p) => p.to_xml(writer)?,
                 CellContent::Table(tbl) => tbl.to_xml(writer)?,
+                CellContent::RawXml(raw) => writer.get_mut().write_all(raw)?,
             }
         }
 
@@ -924,6 +939,8 @@ impl Default for CT_Tc {
 pub struct CT_Row {
     pub properties: Option<CT_TrPr>,
     pub cells: Vec<CT_Tc>,
+    /// Unknown row-level children preserved for round-trip (tblPrEx, sdt, …).
+    pub extra_xml: Vec<Vec<u8>>,
 }
 
 #[allow(non_snake_case)]
@@ -932,12 +949,14 @@ impl CT_Row {
         CT_Row {
             properties: None,
             cells: Vec::new(),
+            extra_xml: Vec::new(),
         }
     }
 
     pub fn from_xml(reader: &mut Reader<&[u8]>) -> Result<Self> {
         let mut properties = None;
         let mut cells = Vec::new();
+        let mut extra_xml: Vec<Vec<u8>> = Vec::new();
         let mut buf = Vec::new();
 
         loop {
@@ -949,7 +968,7 @@ impl CT_Row {
                     } else if matches_local_name(name.as_ref(), b"tc") {
                         cells.push(CT_Tc::from_xml(reader)?);
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        extra_xml.push(crate::raw_xml::capture_element(reader, e)?);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"tr") => {
@@ -962,7 +981,11 @@ impl CT_Row {
             buf.clear();
         }
 
-        Ok(CT_Row { properties, cells })
+        Ok(CT_Row {
+            properties,
+            cells,
+            extra_xml,
+        })
     }
 
     pub fn to_xml<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<()> {
@@ -974,6 +997,10 @@ impl CT_Row {
 
         for cell in &self.cells {
             cell.to_xml(writer)?;
+        }
+
+        for raw in &self.extra_xml {
+            writer.get_mut().write_all(raw)?;
         }
 
         writer.write_event(Event::End(BytesEnd::new("w:tr")))?;
@@ -995,6 +1022,8 @@ pub struct CT_Tbl {
     pub properties: Option<CT_TblPr>,
     pub grid: Option<CT_TblGrid>,
     pub rows: Vec<CT_Row>,
+    /// Unknown table-level children preserved for round-trip (bookmarks, sdt, …).
+    pub extra_xml: Vec<Vec<u8>>,
 }
 
 #[allow(non_snake_case)]
@@ -1004,6 +1033,7 @@ impl CT_Tbl {
             properties: None,
             grid: None,
             rows: Vec::new(),
+            extra_xml: Vec::new(),
         }
     }
 
@@ -1011,6 +1041,7 @@ impl CT_Tbl {
         let mut properties = None;
         let mut grid = None;
         let mut rows = Vec::new();
+        let mut extra_xml: Vec<Vec<u8>> = Vec::new();
         let mut buf = Vec::new();
 
         loop {
@@ -1024,7 +1055,13 @@ impl CT_Tbl {
                     } else if matches_local_name(name.as_ref(), b"tr") {
                         rows.push(CT_Row::from_xml(reader)?);
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        extra_xml.push(crate::raw_xml::capture_element(reader, e)?);
+                    }
+                }
+                Ok(Event::Empty(ref e)) => {
+                    let name = e.name();
+                    if !matches_local_name(name.as_ref(), b"tbl") {
+                        extra_xml.push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"tbl") => {
@@ -1041,6 +1078,7 @@ impl CT_Tbl {
             properties,
             grid,
             rows,
+            extra_xml,
         })
     }
 
@@ -1057,6 +1095,10 @@ impl CT_Tbl {
 
         for row in &self.rows {
             row.to_xml(writer)?;
+        }
+
+        for raw in &self.extra_xml {
+            writer.get_mut().write_all(raw)?;
         }
 
         writer.write_event(Event::End(BytesEnd::new("w:tbl")))?;
@@ -1100,6 +1142,19 @@ mod tests {
         let out = String::from_utf8(w.into_inner()).unwrap();
         assert!(out.contains("w:tblCaption"), "tblCaption lost: {out}");
         assert!(out.contains("w:hideMark"), "hideMark lost: {out}");
+    }
+
+    #[test]
+    fn table_preserves_unknown_content() {
+        // A bookmark between rows (table-level) and an SDT inside a cell must survive.
+        let tbl = parse_table(
+            r#"<w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid><w:bookmarkStart w:id="5" w:name="T"/><w:tr><w:tc><w:sdt><w:sdtContent><w:p/></w:sdtContent></w:sdt></w:tc></w:tr><w:bookmarkEnd w:id="5"/>"#,
+        );
+        let mut w = Writer::new(Vec::new());
+        tbl.to_xml(&mut w).unwrap();
+        let out = String::from_utf8(w.into_inner()).unwrap();
+        assert!(out.contains("w:bookmarkStart"), "bookmark lost: {out}");
+        assert!(out.contains("w:sdt"), "cell SDT lost: {out}");
     }
 
     #[test]

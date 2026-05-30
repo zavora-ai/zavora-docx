@@ -5,6 +5,7 @@
 
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, Event};
 use quick_xml::{Reader, Writer};
+use std::io::Write;
 
 use crate::error::Result;
 use crate::namespace::{W_NS, matches_local_name};
@@ -291,26 +292,30 @@ impl CT_AbstractNum {
 pub struct CT_Num {
     pub num_id: u32,
     pub abstract_num_id: u32,
+    /// Unknown children preserved for round-trip (lvlOverride).
+    pub extra_xml: Vec<Vec<u8>>,
 }
 
 #[allow(non_snake_case)]
 impl CT_Num {
     pub fn from_xml(reader: &mut Reader<&[u8]>, num_id: u32) -> Result<Self> {
         let mut abstract_num_id = 0;
+        let mut extra_xml: Vec<Vec<u8>> = Vec::new();
         let mut buf = Vec::new();
 
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Empty(ref e)) => {
-                    if matches_local_name(e.name().as_ref(), b"abstractNumId")
-                        && let Some(val) = get_val_attr(e)?
-                    {
-                        abstract_num_id = val.parse()?;
+                    if matches_local_name(e.name().as_ref(), b"abstractNumId") {
+                        if let Some(val) = get_val_attr(e)? {
+                            abstract_num_id = val.parse()?;
+                        }
+                    } else {
+                        extra_xml.push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::Start(ref e)) => {
-                    // Skip lvlOverride and other nested elements
-                    reader.read_to_end_into(e.name(), &mut Vec::new())?;
+                    extra_xml.push(crate::raw_xml::capture_element(reader, e)?);
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"num") => {
                     break;
@@ -325,6 +330,7 @@ impl CT_Num {
         Ok(CT_Num {
             num_id,
             abstract_num_id,
+            extra_xml,
         })
     }
 
@@ -338,6 +344,10 @@ impl CT_Num {
         abs_ref.push_attribute(("w:val", buf.format(self.abstract_num_id)));
         writer.write_event(Event::Empty(abs_ref))?;
 
+        for raw in &self.extra_xml {
+            writer.get_mut().write_all(raw)?;
+        }
+
         writer.write_event(Event::End(BytesEnd::new("w:num")))?;
         Ok(())
     }
@@ -348,6 +358,8 @@ impl CT_Num {
 pub struct CT_Numbering {
     pub abstract_nums: Vec<CT_AbstractNum>,
     pub nums: Vec<CT_Num>,
+    /// Unknown root children preserved for round-trip (numPicBullet, …).
+    pub extra_xml: Vec<Vec<u8>>,
 }
 
 #[allow(non_snake_case)]
@@ -356,6 +368,7 @@ impl CT_Numbering {
         CT_Numbering {
             abstract_nums: Vec::new(),
             nums: Vec::new(),
+            extra_xml: Vec::new(),
         }
     }
 
@@ -366,6 +379,7 @@ impl CT_Numbering {
 
         let mut abstract_nums = Vec::new();
         let mut nums = Vec::new();
+        let mut extra_xml: Vec<Vec<u8>> = Vec::new();
         let mut buf = Vec::new();
 
         loop {
@@ -393,7 +407,13 @@ impl CT_Numbering {
                     } else if matches_local_name(name.as_ref(), b"numbering") {
                         // root element, continue
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        extra_xml.push(crate::raw_xml::capture_element(&mut reader, e)?);
+                    }
+                }
+                Ok(Event::Empty(ref e)) => {
+                    let name = e.name();
+                    if !matches_local_name(name.as_ref(), b"numbering") {
+                        extra_xml.push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::Eof) => break,
@@ -406,6 +426,7 @@ impl CT_Numbering {
         Ok(CT_Numbering {
             abstract_nums,
             nums,
+            extra_xml,
         })
     }
 
@@ -426,6 +447,10 @@ impl CT_Numbering {
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
         ));
         writer.write_event(Event::Start(start))?;
+
+        for raw in &self.extra_xml {
+            writer.get_mut().write_all(raw)?;
+        }
 
         for abs in &self.abstract_nums {
             abs.to_xml(&mut writer)?;
@@ -499,6 +524,7 @@ impl CT_Numbering {
         self.nums.push(CT_Num {
             num_id,
             abstract_num_id: abs_id,
+            extra_xml: Vec::new(),
         });
 
         num_id
@@ -546,6 +572,7 @@ impl CT_Numbering {
         self.nums.push(CT_Num {
             num_id,
             abstract_num_id: abs_id,
+            extra_xml: Vec::new(),
         });
 
         num_id
@@ -707,12 +734,15 @@ mod tests {
 
     #[test]
     fn numbering_preserves_unknown_children() {
-        // nsid/tmpl (abstractNum identity) and suff (level) are real elements we don't model.
-        let xml = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:nsid w:val="1A2B3C4D"/><w:multiLevelType w:val="hybridMultilevel"/><w:tmpl w:val="FFFF"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:suff w:val="space"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>"#;
+        // nsid/tmpl (abstractNum identity), suff (level), numPicBullet (root),
+        // and lvlOverride (num instance) are real elements we don't model.
+        let xml = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numPicBullet w:numPicBulletId="0"><w:pict/></w:numPicBullet><w:abstractNum w:abstractNumId="0"><w:nsid w:val="1A2B3C4D"/><w:multiLevelType w:val="hybridMultilevel"/><w:tmpl w:val="FFFF"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:suff w:val="space"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="3"/></w:lvlOverride></w:num></w:numbering>"#;
         let parsed = CT_Numbering::from_xml(xml).unwrap();
         let out = String::from_utf8(parsed.to_xml().unwrap()).unwrap();
         assert!(out.contains(r#"w:val="1A2B3C4D""#), "nsid lost: {out}");
         assert!(out.contains("w:tmpl"), "tmpl lost: {out}");
         assert!(out.contains("w:suff"), "suff lost: {out}");
+        assert!(out.contains("w:numPicBullet"), "numPicBullet lost: {out}");
+        assert!(out.contains("w:lvlOverride"), "lvlOverride lost: {out}");
     }
 }

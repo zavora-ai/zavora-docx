@@ -462,6 +462,7 @@ fn emit_table(
                     CellContent::Table(nested) => {
                         emit_table(out, nested, styles, images, hyperlink_urls, options);
                     }
+                    CellContent::RawXml(_) => {}
                 }
             }
 
