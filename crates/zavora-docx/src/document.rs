@@ -1850,7 +1850,7 @@ impl Document {
     /// # Arguments
     /// * `index` - Body content index at which to insert the TOC
     /// * `max_level` - Maximum heading level to include (1-9, typically 3)
-    pub fn insert_toc(&mut self, index: usize, max_level: u32) {
+    pub fn insert_toc(&mut self, index: usize, max_level: u32) -> usize {
         use rdocx_oxml::borders::{CT_TabStop, CT_Tabs};
         use rdocx_oxml::shared::{ST_TabJc, ST_TabLeader};
         use rdocx_oxml::text::HyperlinkSpan;
@@ -1890,6 +1890,9 @@ impl Document {
         // Step 2: Insert bookmark markers at each heading paragraph (as raw XML in extra_xml)
         // We insert bookmarkStart/bookmarkEnd as extra_xml at position 0 in the paragraph.
         // Adjust for insertions that shift indices.
+        if headings.is_empty() {
+            return 0;
+        }
         let mut bookmark_id = 100; // Start at a high ID to avoid collision
         for heading in &headings {
             if let Some(BodyContent::Paragraph(p)) =
@@ -2003,6 +2006,8 @@ impl Document {
 
         // Force Word to recalculate PAGEREF fields on open so page numbers resolve.
         self.update_fields = true;
+
+        headings.len()
     }
 
     /// Detect heading level from a paragraph's style ID.
