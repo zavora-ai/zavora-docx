@@ -161,7 +161,12 @@ impl Chart {
         }
 
         // Data labels: pie shows category + percentage; others show values.
+        // Place labels outside the fill (outEnd) where valid so the text sits
+        // on the white chart background and stays readable on any slice/bar color.
         w.write_event(Event::Start(BytesStart::new("c:dLbls")))?;
+        if matches!(self.kind, ChartKind::Pie | ChartKind::Bar | ChartKind::Column) {
+            str_el(w, "c:dLblPos", "outEnd")?;
+        }
         if self.kind == ChartKind::Pie {
             bool_el(w, "c:showLegendKey", false)?;
             bool_el(w, "c:showVal", false)?;
