@@ -40,6 +40,8 @@ pub struct Document {
     update_fields: bool,
     /// Emit evenAndOddHeaders so verso/recto headers render distinctly.
     even_odd_headers: bool,
+    /// Emit autoHyphenation so justified body text breaks long words.
+    auto_hyphenation: bool,
     /// Part name for the main document
     doc_part_name: String,
     /// Cached count of image media parts (avoids rescanning parts on each embed).
@@ -70,6 +72,7 @@ impl Document {
             protection_type: None,
             update_fields: false,
             even_odd_headers: false,
+            auto_hyphenation: false,
             doc_part_name: "/word/document.xml".to_string(),
             image_counter: 0,
         }
@@ -167,6 +170,7 @@ impl Document {
             protection_type: None,
             update_fields: false,
             even_odd_headers: false,
+            auto_hyphenation: false,
             doc_part_name,
             image_counter,
         })
@@ -245,8 +249,12 @@ impl Document {
             );
         }
 
-        // Serialize settings.xml if we need protection, field recalc, or even/odd headers.
-        if self.protection_type.is_some() || self.update_fields || self.even_odd_headers {
+        // Serialize settings.xml if we need protection, field recalc, even/odd headers, or hyphenation.
+        if self.protection_type.is_some()
+            || self.update_fields
+            || self.even_odd_headers
+            || self.auto_hyphenation
+        {
             let update = if self.update_fields {
                 r#"<w:updateFields w:val="true"/>"#
             } else {
@@ -257,13 +265,18 @@ impl Document {
             } else {
                 ""
             };
+            let hyphen = if self.auto_hyphenation {
+                r#"<w:autoHyphenation w:val="true"/>"#
+            } else {
+                ""
+            };
             let prot = self
                 .protection_type
                 .as_ref()
                 .map(|p| format!(r#"<w:documentProtection w:edit="{p}" w:enforcement="1"/>"#))
                 .unwrap_or_default();
             let xml = format!(
-                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{update}{even_odd}{prot}</w:settings>"#,
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{update}{even_odd}{hyphen}{prot}</w:settings>"#,
             );
             self.package.set_part("/word/settings.xml", xml.into_bytes());
             self.package.content_types.add_override(
@@ -620,6 +633,12 @@ impl Document {
     /// the section properties.
     pub fn set_header(&mut self, text: &str) {
         self.set_header_footer_part(text, true, HdrFtrType::Default);
+    }
+
+    /// Enable automatic hyphenation — breaks long words across lines, reducing
+    /// the large inter-word gaps that justified body text otherwise produces.
+    pub fn set_auto_hyphenation(&mut self, val: bool) {
+        self.auto_hyphenation = val;
     }
 
     /// Set a professionally-styled running header: centered, italic, small-caps,
