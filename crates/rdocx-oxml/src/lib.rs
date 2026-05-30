@@ -10,6 +10,7 @@
 #![allow(clippy::large_enum_variant)]
 #![allow(clippy::should_implement_trait)]
 
+pub mod app_properties;
 pub mod borders;
 pub mod core_properties;
 pub mod document;

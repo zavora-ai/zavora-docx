@@ -48,6 +48,8 @@ pub struct Document {
     image_counter: usize,
     /// Typed document settings (new settings + round-trip of loaded settings.xml).
     settings: rdocx_oxml::settings::CT_Settings,
+    /// Extended properties (docProps/app.xml).
+    app_properties: Option<rdocx_oxml::app_properties::AppProperties>,
 }
 
 impl Document {
@@ -78,6 +80,7 @@ impl Document {
             doc_part_name: "/word/document.xml".to_string(),
             image_counter: 0,
             settings: rdocx_oxml::settings::CT_Settings::default(),
+            app_properties: None,
         }
     }
 
@@ -167,6 +170,11 @@ impl Document {
             .and_then(|xml| rdocx_oxml::settings::CT_Settings::from_xml(xml).ok())
             .unwrap_or_default();
 
+        // Load extended properties (docProps/app.xml) for round-trip.
+        let app_properties = package
+            .get_part("/docProps/app.xml")
+            .and_then(|xml| rdocx_oxml::app_properties::AppProperties::from_xml(xml).ok());
+
         Ok(Document {
             package,
             document,
@@ -183,6 +191,7 @@ impl Document {
             doc_part_name,
             image_counter,
             settings,
+            app_properties,
         })
     }
 
@@ -225,6 +234,22 @@ impl Document {
                 "/docProps/core.xml",
                 "application/vnd.openxmlformats-package.core-properties+xml",
             );
+        }
+
+        // Serialize docProps/app.xml extended properties if present.
+        if let Some(ref app) = self.app_properties {
+            if !app.is_empty() {
+                let xml = app.to_xml()?;
+                self.package.set_part("/docProps/app.xml", xml);
+                self.package.content_types.add_override(
+                    "/docProps/app.xml",
+                    "application/vnd.openxmlformats-officedocument.extended-properties+xml",
+                );
+                self.package.package_rels.add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+                    "docProps/app.xml",
+                );
+            }
         }
 
         // Serialize footnotes.xml if we have footnotes
@@ -1682,6 +1707,21 @@ impl Document {
     fn ensure_core_properties(&mut self) -> &mut CoreProperties {
         self.core_properties
             .get_or_insert_with(CoreProperties::default)
+    }
+
+    fn ensure_app_properties(&mut self) -> &mut rdocx_oxml::app_properties::AppProperties {
+        self.app_properties
+            .get_or_insert_with(Default::default)
+    }
+
+    /// Set the authoring application name (docProps/app.xml).
+    pub fn set_application(&mut self, app: &str) {
+        self.ensure_app_properties().application = Some(app.to_string());
+    }
+
+    /// Set the company name (docProps/app.xml).
+    pub fn set_company(&mut self, company: &str) {
+        self.ensure_app_properties().company = Some(company.to_string());
     }
 
     // ---- Footnotes & Endnotes ----
@@ -3788,6 +3828,19 @@ mod tests {
         let mut doc = Document::new();
         doc.add_paragraph("Just text.");
         assert!(doc.images().is_empty());
+    }
+
+    #[test]
+    fn app_properties_round_trip() {
+        let mut doc = Document::new();
+        doc.add_paragraph("Body");
+        doc.set_company("Zavora");
+        doc.set_application("zavora-docx");
+        let bytes = doc.to_bytes().expect("serialize");
+        let reopened = Document::from_bytes(&bytes).expect("open");
+        let app = reopened.app_properties.expect("app props present");
+        assert_eq!(app.company.as_deref(), Some("Zavora"));
+        assert_eq!(app.application.as_deref(), Some("zavora-docx"));
     }
 
     #[test]
