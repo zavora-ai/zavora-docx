@@ -33,6 +33,43 @@ pub struct Series {
     pub values: Vec<f64>,
 }
 
+/// Where data labels are placed. Maps to `c:dLblPos@val`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LabelPosition {
+    OutsideEnd,
+    InsideEnd,
+    Center,
+    InsideBase,
+    BestFit,
+}
+
+impl LabelPosition {
+    fn as_str(self) -> &'static str {
+        match self {
+            LabelPosition::OutsideEnd => "outEnd",
+            LabelPosition::InsideEnd => "inEnd",
+            LabelPosition::Center => "ctr",
+            LabelPosition::InsideBase => "inBase",
+            LabelPosition::BestFit => "bestFit",
+        }
+    }
+}
+
+/// Configurable data-label display. All fields optional so the caller controls
+/// placement, what is shown, and an optional fixed text color.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DataLabels {
+    /// Label position; `None` lets Word use its default for the chart type.
+    pub position: Option<LabelPosition>,
+    pub show_value: bool,
+    pub show_category: bool,
+    pub show_series: bool,
+    pub show_percent: bool,
+    pub show_legend_key: bool,
+    /// Optional fixed label text color (hex, e.g. "FFFFFF").
+    pub color: Option<String>,
+}
+
 /// A chart definition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chart {
@@ -40,9 +77,29 @@ pub struct Chart {
     pub title: Option<String>,
     pub categories: Vec<String>,
     pub series: Vec<Series>,
+    /// Data-label configuration; `None` = sensible per-kind default.
+    pub labels: Option<DataLabels>,
 }
 
 impl Chart {
+    /// Default data labels for a chart kind: pie shows category+percent placed
+    /// outside; cartesian charts show values placed outside the bar/point.
+    pub fn default_labels(kind: ChartKind) -> DataLabels {
+        match kind {
+            ChartKind::Pie => DataLabels {
+                position: Some(LabelPosition::OutsideEnd),
+                show_category: true,
+                show_percent: true,
+                ..Default::default()
+            },
+            _ => DataLabels {
+                position: Some(LabelPosition::OutsideEnd),
+                show_value: true,
+                ..Default::default()
+            },
+        }
+    }
+
     /// Build the full `word/charts/chartN.xml` part content.
     pub fn to_part_bytes(&self) -> Result<Vec<u8>> {
         let mut w = Writer::new(Vec::new());
@@ -160,28 +217,40 @@ impl Chart {
             w.write_event(Event::End(BytesEnd::new("c:ser")))?;
         }
 
-        // Data labels: pie shows category + percentage; others show values.
-        // Place labels outside the fill (outEnd) where valid so the text sits
-        // on the white chart background and stays readable on any slice/bar color.
+        // Data labels (configurable; falls back to a per-kind default).
+        let labels = self.labels.clone().unwrap_or_else(|| Chart::default_labels(self.kind));
         w.write_event(Event::Start(BytesStart::new("c:dLbls")))?;
-        if matches!(self.kind, ChartKind::Pie | ChartKind::Bar | ChartKind::Column) {
-            str_el(w, "c:dLblPos", "outEnd")?;
+        // Optional fixed text color via c:txPr (must precede the show* flags).
+        if let Some(ref hex) = labels.color {
+            w.write_event(Event::Start(BytesStart::new("c:txPr")))?;
+            w.write_event(Event::Empty(BytesStart::new("a:bodyPr")))?;
+            w.write_event(Event::Empty(BytesStart::new("a:lstStyle")))?;
+            w.write_event(Event::Start(BytesStart::new("a:p")))?;
+            w.write_event(Event::Start(BytesStart::new("a:pPr")))?;
+            w.write_event(Event::Start(BytesStart::new("a:defRPr")))?;
+            w.write_event(Event::Start(BytesStart::new("a:solidFill")))?;
+            let mut c = BytesStart::new("a:srgbClr");
+            c.push_attribute(("val", hex.as_str()));
+            w.write_event(Event::Empty(c))?;
+            w.write_event(Event::End(BytesEnd::new("a:solidFill")))?;
+            w.write_event(Event::End(BytesEnd::new("a:defRPr")))?;
+            w.write_event(Event::End(BytesEnd::new("a:pPr")))?;
+            w.write_event(Event::Empty(BytesStart::new("a:endParaRPr")))?;
+            w.write_event(Event::End(BytesEnd::new("a:p")))?;
+            w.write_event(Event::End(BytesEnd::new("c:txPr")))?;
         }
-        if self.kind == ChartKind::Pie {
-            bool_el(w, "c:showLegendKey", false)?;
-            bool_el(w, "c:showVal", false)?;
-            bool_el(w, "c:showCatName", true)?;
-            bool_el(w, "c:showSerName", false)?;
-            bool_el(w, "c:showPercent", true)?;
-            bool_el(w, "c:showBubbleSize", false)?;
-        } else {
-            bool_el(w, "c:showLegendKey", false)?;
-            bool_el(w, "c:showVal", true)?;
-            bool_el(w, "c:showCatName", false)?;
-            bool_el(w, "c:showSerName", false)?;
-            bool_el(w, "c:showPercent", false)?;
-            bool_el(w, "c:showBubbleSize", false)?;
+        // dLblPos is only valid for pie/bar/column.
+        if let Some(pos) = labels.position {
+            if matches!(self.kind, ChartKind::Pie | ChartKind::Bar | ChartKind::Column) {
+                str_el(w, "c:dLblPos", pos.as_str())?;
+            }
         }
+        bool_el(w, "c:showLegendKey", labels.show_legend_key)?;
+        bool_el(w, "c:showVal", labels.show_value)?;
+        bool_el(w, "c:showCatName", labels.show_category)?;
+        bool_el(w, "c:showSerName", labels.show_series)?;
+        bool_el(w, "c:showPercent", labels.show_percent)?;
+        bool_el(w, "c:showBubbleSize", false)?;
         w.write_event(Event::End(BytesEnd::new("c:dLbls")))?;
 
         // Axis id wiring for cartesian charts.
@@ -300,7 +369,23 @@ mod tests {
             title: Some("Sales".into()),
             categories: vec!["Q1".into(), "Q2".into(), "Q3".into()],
             series: vec![Series { name: "2024".into(), values: vec![10.0, 20.0, 15.0] }],
+            labels: None,
         }
+    }
+
+    #[test]
+    fn custom_labels_position_and_color() {
+        let mut c = sample(ChartKind::Pie);
+        c.labels = Some(DataLabels {
+            position: Some(LabelPosition::Center),
+            show_percent: true,
+            color: Some("FFFFFF".into()),
+            ..Default::default()
+        });
+        let x = String::from_utf8(c.to_part_bytes().unwrap()).unwrap();
+        assert!(x.contains(r#"<c:dLblPos val="ctr"/>"#), "{x}");
+        assert!(x.contains(r#"<a:srgbClr val="FFFFFF"/>"#), "{x}");
+        assert!(x.contains(r#"<c:showPercent val="1"/>"#), "{x}");
     }
 
     #[test]
