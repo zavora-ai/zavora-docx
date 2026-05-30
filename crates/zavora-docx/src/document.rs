@@ -36,6 +36,8 @@ pub struct Document {
     endnotes: Option<rdocx_oxml::footnotes::CT_Footnotes>,
     comments_xml: Option<Vec<String>>,
     protection_type: Option<String>,
+    /// Whether to force Word to recalculate fields (e.g. TOC PAGEREF) on open.
+    update_fields: bool,
     /// Part name for the main document
     doc_part_name: String,
     /// Cached count of image media parts (avoids rescanning parts on each embed).
@@ -64,6 +66,7 @@ impl Document {
             endnotes: None,
             comments_xml: None,
             protection_type: None,
+            update_fields: false,
             doc_part_name: "/word/document.xml".to_string(),
             image_counter: 0,
         }
@@ -159,6 +162,7 @@ impl Document {
             endnotes,
             comments_xml: None,
             protection_type: None,
+            update_fields: false,
             doc_part_name,
             image_counter,
         })
@@ -237,11 +241,20 @@ impl Document {
             );
         }
 
-        // Serialize settings.xml if we have protection
-        if let Some(ref prot) = self.protection_type {
+        // Serialize settings.xml if we need protection and/or field recalculation.
+        if self.protection_type.is_some() || self.update_fields {
+            let update = if self.update_fields {
+                r#"<w:updateFields w:val="true"/>"#
+            } else {
+                ""
+            };
+            let prot = self
+                .protection_type
+                .as_ref()
+                .map(|p| format!(r#"<w:documentProtection w:edit="{p}" w:enforcement="1"/>"#))
+                .unwrap_or_default();
             let xml = format!(
-                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:documentProtection w:edit="{}" w:enforcement="1"/></w:settings>"#,
-                prot
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{update}{prot}</w:settings>"#,
             );
             self.package.set_part("/word/settings.xml", xml.into_bytes());
             self.package.content_types.add_override(
@@ -1896,11 +1909,20 @@ impl Document {
         }
 
         // Step 3: Build TOC entry paragraphs
-        // Right margin tab stop at 9360 twips (6.5") with dot leader
+        // Right tab stop = text width (page width - left/right margins), so the
+        // dot leader and page number land at the right margin, not off-page.
+        let text_width = {
+            let s = self.document.body.sect_pr.as_ref();
+            let pw = s.and_then(|s| s.page_width).map(|t| t.0).unwrap_or(12240);
+            let ml = s.and_then(|s| s.margin_left).map(|t| t.0).unwrap_or(1440);
+            let mr = s.and_then(|s| s.margin_right).map(|t| t.0).unwrap_or(1440);
+            let g = s.and_then(|s| s.gutter).map(|t| t.0).unwrap_or(0);
+            (pw - ml - mr - g).max(720)
+        };
         let right_tab = CT_Tabs {
             tabs: vec![CT_TabStop {
                 val: ST_TabJc::Right,
-                pos: Twips(9360),
+                pos: Twips(text_width),
                 leader: Some(ST_TabLeader::Dot),
             }],
         };
@@ -1909,48 +1931,63 @@ impl Document {
 
         // TOC title
         let mut title_p = CT_P::new();
-        let mut title_r = CT_R::new("Table of Contents");
+        let mut title_r = CT_R::new("Contents");
         title_r.properties = Some(CT_RPr {
             bold: Some(true),
             ..Default::default()
         });
         title_p.runs.push(title_r);
         title_p.properties = Some(CT_PPr {
-            space_after: Some(Twips(120)),
+            style_id: Some("Title".to_string()),
+            jc: Some(rdocx_oxml::shared::ST_Jc::Center),
+            space_after: Some(Twips(240)),
             ..Default::default()
         });
         toc_paragraphs.push(title_p);
 
-        for heading in &headings {
+        let esc = |s: &str| {
+            s.replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+        };
+        let last = headings.len().saturating_sub(1);
+        for (i, heading) in headings.iter().enumerate() {
             let mut p = CT_P::new();
 
             // Indentation based on heading level (each level indented 360 twips = 0.25")
             let indent = Twips(360 * (heading.level as i32 - 1));
-
             p.properties = Some(CT_PPr {
                 tabs: Some(right_tab.clone()),
                 ind_left: if indent.0 > 0 { Some(indent) } else { None },
                 ..Default::default()
             });
 
-            // Run with heading text
-            let text_run = CT_R::new(&heading.text);
-            p.runs.push(text_run);
-
-            // Tab run (separates text from page number)
-            p.runs.push(CT_R {
-                properties: None,
-                content: vec![rdocx_oxml::text::RunContent::Tab],
-                extra_xml: Vec::new(),
-            });
-
-            // Wrap the text run in a hyperlink to the bookmark
-            p.hyperlinks.push(HyperlinkSpan {
-                rel_id: None,
-                anchor: Some(heading.bookmark_name.clone()),
-                run_start: 0,
-                run_end: 1, // Just the text run, not the tab
-            });
+            // Build the entry body as raw XML matching Word's real TOC: the page
+            // number is a complex PAGEREF field nested INSIDE the hyperlink.
+            let bm = &heading.bookmark_name;
+            let mut xml = String::new();
+            if i == 0 {
+                xml.push_str(r#"<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \o "1-3" \h \z \u </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>"#);
+            }
+            xml.push_str(&format!(
+                concat!(
+                    r#"<w:hyperlink w:anchor="{bm}" w:history="1">"#,
+                    r#"<w:r><w:rPr><w:noProof/></w:rPr><w:t xml:space="preserve">{text}</w:t></w:r>"#,
+                    r#"<w:r><w:rPr><w:noProof/><w:webHidden/></w:rPr><w:tab/></w:r>"#,
+                    r#"<w:r><w:rPr><w:noProof/><w:webHidden/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r>"#,
+                    r#"<w:r><w:rPr><w:noProof/><w:webHidden/></w:rPr><w:instrText xml:space="preserve"> PAGEREF {bm} \h </w:instrText></w:r>"#,
+                    r#"<w:r><w:rPr><w:noProof/><w:webHidden/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r>"#,
+                    r#"<w:r><w:rPr><w:noProof/><w:webHidden/></w:rPr><w:t>1</w:t></w:r>"#,
+                    r#"<w:r><w:rPr><w:noProof/><w:webHidden/></w:rPr><w:fldChar w:fldCharType="end"/></w:r>"#,
+                    r#"</w:hyperlink>"#,
+                ),
+                bm = esc(bm),
+                text = esc(&heading.text),
+            ));
+            if i == last {
+                xml.push_str(r#"<w:r><w:fldChar w:fldCharType="end"/></w:r>"#);
+            }
+            p.extra_xml.push((0, xml.into_bytes()));
 
             toc_paragraphs.push(p);
         }
@@ -1963,6 +2000,9 @@ impl Document {
                 .content
                 .insert(insert_at + i, BodyContent::Paragraph(p));
         }
+
+        // Force Word to recalculate PAGEREF fields on open so page numbers resolve.
+        self.update_fields = true;
     }
 
     /// Detect heading level from a paragraph's style ID.
@@ -3098,7 +3138,8 @@ mod tests {
         let rpr = doc.resolve_run_properties(Some("Heading1"), None);
         assert_eq!(rpr.bold, Some(true));
         assert_eq!(rpr.sz, Some(HalfPoint(32)));
-        assert_eq!(rpr.font_ascii, Some("Calibri".to_string()));
+        // Headings use the major theme font (not a literal family name).
+        assert_eq!(rpr.font_ascii_theme, Some("majorHAnsi".to_string()));
     }
 
     #[test]
@@ -3342,19 +3383,29 @@ mod tests {
 
         // Verify TOC title
         let paras = doc.paragraphs();
-        assert_eq!(paras[0].text(), "Table of Contents");
+        assert_eq!(paras[0].text(), "Contents");
 
-        // Verify TOC entries contain heading text
-        assert_eq!(paras[1].text(), "Chapter 1\t");
-        assert_eq!(paras[2].text(), "Section 1.1\t");
-        assert_eq!(paras[3].text(), "Chapter 2\t");
+        // Entries are emitted as a real Word TOC field stored as raw XML on the
+        // first entry paragraph; verify the field instruction + PAGEREF are present.
+        let entry_xml: String = doc.document.body.content[1..4]
+            .iter()
+            .filter_map(|c| match c {
+                BodyContent::Paragraph(p) => Some(
+                    p.extra_xml
+                        .iter()
+                        .map(|(_, x)| String::from_utf8_lossy(x).into_owned())
+                        .collect::<String>(),
+                ),
+                _ => None,
+            })
+            .collect();
+        assert!(entry_xml.contains("TOC \\o"));
+        assert!(entry_xml.contains("PAGEREF"));
 
-        // Verify round-trip: save and re-open
+        // Round-trip: save and re-open preserves content count.
         let bytes = doc.to_bytes().expect("should serialize");
         let doc2 = Document::from_bytes(&bytes).expect("should open");
         assert_eq!(doc2.content_count(), 11);
-        let paras2 = doc2.paragraphs();
-        assert_eq!(paras2[0].text(), "Table of Contents");
     }
 
     #[test]

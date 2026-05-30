@@ -235,17 +235,17 @@ fn generate_feature_showcase(_samples_dir: &Path) -> Document {
     {
         let mut p = doc.add_paragraph("");
         p.add_run("Single ")
-            .underline_style(rdocx::UnderlineStyle::Single);
+            .underline_style(zavora_docx::UnderlineStyle::Single);
         p.add_run("Double ")
-            .underline_style(rdocx::UnderlineStyle::Double);
+            .underline_style(zavora_docx::UnderlineStyle::Double);
         p.add_run("Thick ")
-            .underline_style(rdocx::UnderlineStyle::Thick);
+            .underline_style(zavora_docx::UnderlineStyle::Thick);
         p.add_run("Dotted ")
-            .underline_style(rdocx::UnderlineStyle::Dotted);
+            .underline_style(zavora_docx::UnderlineStyle::Dotted);
         p.add_run("Dash ")
-            .underline_style(rdocx::UnderlineStyle::Dash);
+            .underline_style(zavora_docx::UnderlineStyle::Dash);
         p.add_run("Wave ")
-            .underline_style(rdocx::UnderlineStyle::Wave);
+            .underline_style(zavora_docx::UnderlineStyle::Wave);
     }
 
     // ── SECTION 2: PARAGRAPH FORMATTING ──

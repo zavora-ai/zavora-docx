@@ -202,11 +202,12 @@ mod tests {
     fn test_styles() -> CT_Styles {
         let mut styles = CT_Styles::new_default();
 
-        // Add a Heading2 based on Heading1
+        // Add a custom style based on Heading1 (unique id avoids colliding with
+        // the shipped Heading2 in new_default).
         styles.styles.push(CT_Style {
-            style_id: "Heading2".to_string(),
+            style_id: "MyHeading2".to_string(),
             style_type: StyleType::Paragraph,
-            name: Some("heading 2".to_string()),
+            name: Some("my heading 2".to_string()),
             based_on: Some("Heading1".to_string()),
             next_style: Some("Normal".to_string()),
             is_default: false,
@@ -247,24 +248,24 @@ mod tests {
     #[test]
     fn resolve_heading2_inherits_heading1() {
         let styles = test_styles();
-        let ppr = resolve_paragraph_properties(Some("Heading2"), &styles);
+        let ppr = resolve_paragraph_properties(Some("MyHeading2"), &styles);
         // keepNext inherited from Heading1
         assert_eq!(ppr.keep_next, Some(true));
-        // spaceBefore overridden by Heading2
+        // spaceBefore overridden by MyHeading2
         assert_eq!(ppr.space_before, Some(Twips(40)));
     }
 
     #[test]
     fn resolve_heading2_rpr() {
         let styles = test_styles();
-        let rpr = resolve_run_properties(Some("Heading2"), None, &styles);
-        // Font from docDefaults
-        assert_eq!(rpr.font_ascii, Some("Calibri".to_string()));
-        // Size overridden by Heading2 (not Heading1's 32)
+        let rpr = resolve_run_properties(Some("MyHeading2"), None, &styles);
+        // Font inherited from Heading1's major theme font
+        assert_eq!(rpr.font_ascii_theme, Some("majorHAnsi".to_string()));
+        // Size overridden by MyHeading2 (not Heading1's 32)
         assert_eq!(rpr.sz, Some(HalfPoint(26)));
         // Bold inherited from Heading1
         assert_eq!(rpr.bold, Some(true));
-        // Color from Heading2
+        // Color from MyHeading2
         assert_eq!(rpr.color, Some("2E74B5".to_string()));
     }
 

@@ -315,8 +315,12 @@ fn style_inheritance_resolution() {
     // Heading1's rpr should have bold from the style definition
     let rpr = doc.resolve_run_properties(Some("Heading1"), None);
     assert_eq!(rpr.bold, Some(true));
-    // Font inherited from docDefaults
-    assert_eq!(rpr.font_ascii, Some("Calibri".to_string()));
+    // Headings use the major theme font
+    assert_eq!(rpr.font_ascii_theme, Some("majorHAnsi".to_string()));
+
+    // Normal paragraph inherits the body (minor) theme font from docDefaults
+    let normal_rpr = doc.resolve_run_properties(Some("Normal"), None);
+    assert_eq!(normal_rpr.font_ascii_theme, Some("minorHAnsi".to_string()));
 
     // Normal paragraph should get docDefaults spacing
     let ppr = doc.resolve_paragraph_properties(Some("Normal"));
@@ -913,7 +917,7 @@ fn comprehensive_document_round_trip_with_nested() {
 
     // Table with formatting
     let mut tbl = doc.add_table(3, 3);
-    tbl = tbl.borders(rdocx::BorderStyle::Single, 4, "000000");
+    tbl = tbl.borders(zavora_docx::BorderStyle::Single, 4, "000000");
 
     // Header row
     tbl.row(0).unwrap().header();

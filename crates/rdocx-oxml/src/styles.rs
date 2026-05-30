@@ -371,9 +371,49 @@ impl CT_Styles {
             .find(|s| s.style_type == style_type && s.is_default)
     }
 
-    /// Create a minimal default styles part for a new document.
+    /// Create a complete professional default styles part for a new document.
+    /// Ships Word-equivalent styles: Normal, Title, Subtitle, Heading1-6, Quote,
+    /// IntenseQuote, ListParagraph, Caption — all wired to theme fonts with outline
+    /// levels so the navigation pane and TOC work automatically.
     pub fn new_default() -> Self {
-        use crate::units::HalfPoint;
+        use crate::units::{HalfPoint, Twips};
+
+        // Body font = theme minor (minorHAnsi); heading font = theme major (majorHAnsi).
+        let body_rpr = || CT_RPr {
+            font_ascii_theme: Some("minorHAnsi".to_string()),
+            font_hansi_theme: Some("minorHAnsi".to_string()),
+            ..Default::default()
+        };
+        let heading_rpr = |sz: u32, color: &str, bold: bool| CT_RPr {
+            font_ascii_theme: Some("majorHAnsi".to_string()),
+            font_hansi_theme: Some("majorHAnsi".to_string()),
+            sz: Some(HalfPoint(sz)),
+            sz_cs: Some(HalfPoint(sz)),
+            bold: if bold { Some(true) } else { None },
+            bold_cs: if bold { Some(true) } else { None },
+            color: Some(color.to_string()),
+            color_theme: Some("accent1".to_string()),
+            ..Default::default()
+        };
+        let heading_ppr = |before: i32, after: i32, lvl: u32| CT_PPr {
+            keep_next: Some(true),
+            keep_lines: Some(true),
+            space_before: Some(Twips(before)),
+            space_after: Some(Twips(after)),
+            outline_lvl: Some(lvl),
+            ..Default::default()
+        };
+        let para_style = |id: &str, name: &str, based: Option<&str>, next: Option<&str>,
+                          ppr: Option<CT_PPr>, rpr: Option<CT_RPr>| CT_Style {
+            style_id: id.to_string(),
+            style_type: StyleType::Paragraph,
+            name: Some(name.to_string()),
+            based_on: based.map(|s| s.to_string()),
+            next_style: next.map(|s| s.to_string()),
+            is_default: false,
+            ppr,
+            rpr,
+        };
 
         let normal = CT_Style {
             style_id: "Normal".to_string(),
@@ -386,43 +426,83 @@ impl CT_Styles {
             rpr: None,
         };
 
-        let heading1 = CT_Style {
-            style_id: "Heading1".to_string(),
-            style_type: StyleType::Paragraph,
-            name: Some("heading 1".to_string()),
-            based_on: Some("Normal".to_string()),
-            next_style: Some("Normal".to_string()),
-            is_default: false,
-            ppr: Some(CT_PPr {
-                keep_next: Some(true),
-                keep_lines: Some(true),
-                space_before: Some(crate::units::Twips(240)),
-                space_after: Some(crate::units::Twips(0)),
+        // Title: large, no outline level (it's the doc title, not a heading)
+        let title = para_style("Title", "Title", Some("Normal"), Some("Normal"),
+            Some(CT_PPr { space_after: Some(Twips(80)), ..Default::default() }),
+            Some(CT_RPr {
+                font_ascii_theme: Some("majorHAnsi".to_string()),
+                font_hansi_theme: Some("majorHAnsi".to_string()),
+                sz: Some(HalfPoint(56)), sz_cs: Some(HalfPoint(56)),
+                color: Some("000000".to_string()),
+                spacing: Some(Twips(-10)),
+                ..Default::default()
+            }));
+
+        let subtitle = para_style("Subtitle", "Subtitle", Some("Normal"), Some("Normal"),
+            Some(CT_PPr { space_after: Some(Twips(160)), ..Default::default() }),
+            Some(CT_RPr {
+                font_ascii_theme: Some("minorHAnsi".to_string()),
+                font_hansi_theme: Some("minorHAnsi".to_string()),
+                sz: Some(HalfPoint(28)), sz_cs: Some(HalfPoint(28)),
+                italic: Some(true), italic_cs: Some(true),
+                color: Some("5A5A5A".to_string()),
+                ..Default::default()
+            }));
+
+        // Headings 1-6 with descending sizes, all with outline levels 0-5
+        let h1 = para_style("Heading1", "heading 1", Some("Normal"), Some("Normal"),
+            Some(heading_ppr(240, 0, 0)), Some(heading_rpr(32, "2F5496", true)));
+        let h2 = para_style("Heading2", "heading 2", Some("Normal"), Some("Normal"),
+            Some(heading_ppr(160, 0, 1)), Some(heading_rpr(26, "2F5496", true)));
+        let h3 = para_style("Heading3", "heading 3", Some("Normal"), Some("Normal"),
+            Some(heading_ppr(160, 0, 2)), Some(heading_rpr(24, "1F3763", true)));
+        let h4 = para_style("Heading4", "heading 4", Some("Normal"), Some("Normal"),
+            Some(heading_ppr(80, 0, 3)), Some(CT_RPr { italic: Some(true), italic_cs: Some(true), ..heading_rpr(22, "2F5496", false) }));
+        let h5 = para_style("Heading5", "heading 5", Some("Normal"), Some("Normal"),
+            Some(heading_ppr(80, 0, 4)), Some(heading_rpr(22, "2F5496", false)));
+        let h6 = para_style("Heading6", "heading 6", Some("Normal"), Some("Normal"),
+            Some(heading_ppr(40, 0, 5)), Some(CT_RPr { italic: Some(true), italic_cs: Some(true), ..heading_rpr(22, "1F3763", false) }));
+
+        let quote = para_style("Quote", "Quote", Some("Normal"), Some("Normal"),
+            Some(CT_PPr {
+                space_before: Some(Twips(200)), space_after: Some(Twips(200)),
+                ind_left: Some(Twips(720)), ind_right: Some(Twips(720)),
                 ..Default::default()
             }),
-            rpr: Some(CT_RPr {
-                sz: Some(HalfPoint(32)),
-                sz_cs: Some(HalfPoint(32)),
-                bold: Some(true),
-                bold_cs: Some(true),
-                color: Some("2F5496".to_string()),
+            Some(CT_RPr { italic: Some(true), italic_cs: Some(true), color: Some("404040".to_string()), ..body_rpr() }));
+
+        let intense_quote = para_style("IntenseQuote", "Intense Quote", Some("Normal"), Some("Normal"),
+            Some(CT_PPr {
+                space_before: Some(Twips(200)), space_after: Some(Twips(200)),
+                ind_left: Some(Twips(720)), ind_right: Some(Twips(720)),
+                borders: Some(crate::borders::CT_PBdr {
+                    bottom: Some(crate::borders::CT_BorderEdge { val: crate::shared::ST_Border::Single, sz: Some(8), space: Some(10), color: Some("4472C4".to_string()) }),
+                    top: Some(crate::borders::CT_BorderEdge { val: crate::shared::ST_Border::Single, sz: Some(8), space: Some(10), color: Some("4472C4".to_string()) }),
+                    ..Default::default()
+                }),
                 ..Default::default()
             }),
-        };
+            Some(CT_RPr { italic: Some(true), italic_cs: Some(true), bold: Some(true), color: Some("4472C4".to_string()), color_theme: Some("accent1".to_string()), ..body_rpr() }));
+
+        let list_paragraph = para_style("ListParagraph", "List Paragraph", Some("Normal"), None,
+            Some(CT_PPr { ind_left: Some(Twips(720)), ..Default::default() }), None);
+
+        let caption = para_style("Caption", "caption", Some("Normal"), Some("Normal"),
+            Some(CT_PPr { space_after: Some(Twips(200)), ..Default::default() }),
+            Some(CT_RPr { italic: Some(true), italic_cs: Some(true), sz: Some(HalfPoint(18)), sz_cs: Some(HalfPoint(18)), color: Some("44546A".to_string()), ..body_rpr() }));
 
         let doc_defaults = CT_DocDefaults {
             rpr: Some(CT_RPr {
-                font_ascii: Some("Calibri".to_string()),
-                font_hansi: Some("Calibri".to_string()),
-                font_east_asia: Some("Calibri".to_string()),
+                font_ascii_theme: Some("minorHAnsi".to_string()),
+                font_hansi_theme: Some("minorHAnsi".to_string()),
                 font_cs: Some("Times New Roman".to_string()),
                 sz: Some(HalfPoint(22)),
                 sz_cs: Some(HalfPoint(22)),
                 ..Default::default()
             }),
             ppr: Some(CT_PPr {
-                space_after: Some(crate::units::Twips(160)),
-                line_spacing: Some(crate::units::Twips(259)),
+                space_after: Some(Twips(160)),
+                line_spacing: Some(Twips(259)),
                 line_rule: Some("auto".to_string()),
                 ..Default::default()
             }),
@@ -430,7 +510,7 @@ impl CT_Styles {
 
         CT_Styles {
             doc_defaults: Some(doc_defaults),
-            styles: vec![normal, heading1],
+            styles: vec![normal, title, subtitle, h1, h2, h3, h4, h5, h6, quote, intense_quote, list_paragraph, caption],
         }
     }
 }
@@ -462,7 +542,7 @@ mod tests {
         let xml = styles.to_xml().unwrap();
         let parsed = CT_Styles::from_xml(&xml).unwrap();
 
-        assert_eq!(parsed.styles.len(), 2);
+        assert_eq!(parsed.styles.len(), 13);
         assert!(parsed.doc_defaults.is_some());
 
         let normal = parsed.get_by_id("Normal").unwrap();
