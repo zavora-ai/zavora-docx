@@ -85,6 +85,7 @@ impl Chart {
         // Legend
         w.write_event(Event::Start(BytesStart::new("c:legend")))?;
         str_el(&mut w, "c:legendPos", "r")?;
+        bool_el(&mut w, "c:overlay", false)?;
         w.write_event(Event::End(BytesEnd::new("c:legend")))?;
         bool_el(&mut w, "c:plotVisOnly", true)?;
 
@@ -158,6 +159,25 @@ impl Chart {
             w.write_event(Event::End(BytesEnd::new("c:val")))?;
             w.write_event(Event::End(BytesEnd::new("c:ser")))?;
         }
+
+        // Data labels: pie shows category + percentage; others show values.
+        w.write_event(Event::Start(BytesStart::new("c:dLbls")))?;
+        if self.kind == ChartKind::Pie {
+            bool_el(w, "c:showLegendKey", false)?;
+            bool_el(w, "c:showVal", false)?;
+            bool_el(w, "c:showCatName", true)?;
+            bool_el(w, "c:showSerName", false)?;
+            bool_el(w, "c:showPercent", true)?;
+            bool_el(w, "c:showBubbleSize", false)?;
+        } else {
+            bool_el(w, "c:showLegendKey", false)?;
+            bool_el(w, "c:showVal", true)?;
+            bool_el(w, "c:showCatName", false)?;
+            bool_el(w, "c:showSerName", false)?;
+            bool_el(w, "c:showPercent", false)?;
+            bool_el(w, "c:showBubbleSize", false)?;
+        }
+        w.write_event(Event::End(BytesEnd::new("c:dLbls")))?;
 
         // Axis id wiring for cartesian charts.
         if self.kind != ChartKind::Pie {
