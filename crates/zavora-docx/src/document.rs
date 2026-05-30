@@ -22,6 +22,19 @@ use crate::paragraph::{Paragraph, ParagraphRef};
 use crate::style::{self, Style, StyleBuilder};
 use crate::table::{Table, TableRef};
 
+/// A single comment, with optional threading (parent) and resolved state.
+#[derive(Debug, Clone)]
+struct CommentData {
+    id: u32,
+    author: String,
+    text: String,
+    /// Stable paragraph id (w14:paraId) used by commentsExtended for threading.
+    para_id: String,
+    /// Parent comment id for replies (None = top-level).
+    parent: Option<u32>,
+    resolved: bool,
+}
+
 /// A Word document (.docx file).
 ///
 /// This is the main entry point for reading, creating, and modifying
@@ -34,7 +47,7 @@ pub struct Document {
     core_properties: Option<CoreProperties>,
     footnotes: Option<rdocx_oxml::footnotes::CT_Footnotes>,
     endnotes: Option<rdocx_oxml::footnotes::CT_Footnotes>,
-    comments_xml: Option<Vec<String>>,
+    comments: Vec<CommentData>,
     protection_type: Option<String>,
     /// Whether to force Word to recalculate fields (e.g. TOC PAGEREF) on open.
     update_fields: bool,
@@ -72,7 +85,7 @@ impl Document {
             core_properties: None,
             footnotes: None,
             endnotes: None,
-            comments_xml: None,
+            comments: Vec::new(),
             protection_type: None,
             update_fields: false,
             even_odd_headers: false,
@@ -183,7 +196,7 @@ impl Document {
             core_properties,
             footnotes,
             endnotes,
-            comments_xml: None,
+            comments: Vec::new(),
             protection_type: settings.protection.clone(),
             update_fields: settings.update_fields,
             even_odd_headers: settings.even_odd_headers,
@@ -277,15 +290,52 @@ impl Document {
         }
 
         // Serialize comments.xml if we have comments
-        if let Some(ref comments) = self.comments_xml {
-            let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
-            for c in comments { xml.push_str(c); }
+        if !self.comments.is_empty() {
+            // comments.xml — each comment paragraph carries a w14:paraId.
+            let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">"#);
+            for c in &self.comments {
+                xml.push_str(&format!(
+                    r#"<w:comment w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" w:initials=""><w:p w14:paraId="{}"><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:p></w:comment>"#,
+                    c.id,
+                    xml_escape(&c.author),
+                    c.para_id,
+                    xml_escape(&c.text),
+                ));
+            }
             xml.push_str("</w:comments>");
             self.package.set_part("/word/comments.xml", xml.into_bytes());
             self.package.content_types.add_override(
                 "/word/comments.xml",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
             );
+
+            // commentsExtended.xml — threading (paraIdParent) and resolved (done).
+            let mut ext = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">"#);
+            for c in &self.comments {
+                let parent_attr = c
+                    .parent
+                    .and_then(|pid| self.comments.iter().find(|x| x.id == pid))
+                    .map(|pc| format!(r#" w15:paraIdParent="{}""#, pc.para_id))
+                    .unwrap_or_default();
+                ext.push_str(&format!(
+                    r#"<w15:commentEx w15:paraId="{}"{} w15:done="{}"/>"#,
+                    c.para_id,
+                    parent_attr,
+                    if c.resolved { "1" } else { "0" },
+                ));
+            }
+            ext.push_str("</w15:commentsEx>");
+            self.package.set_part("/word/commentsExtended.xml", ext.into_bytes());
+            self.package.content_types.add_override(
+                "/word/commentsExtended.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
+            );
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add_if_absent(
+                    "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
+                    "commentsExtended.xml",
+                );
         }
 
         // Serialize settings.xml via the typed model, merging the legacy bool
@@ -1853,21 +1903,41 @@ impl Document {
     /// Add a comment to the document. Returns the comment ID.
     /// Use the ID with `paragraph.comment_start(id)` and `paragraph.comment_end(id)` to mark the commented range.
     pub fn add_comment(&mut self, id: u32, author: &str, text: &str) {
-        // Build comment XML and append to comments part
-        let comment_xml = format!(
-            r#"<w:comment w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>{}</w:t></w:r></w:p></w:comment>"#,
-            id, author, text
-        );
-        let comments = self.comments_xml.get_or_insert_with(|| {
+        self.push_comment(id, author, text, None, false);
+    }
+
+    /// Add a threaded reply to an existing comment.
+    pub fn add_comment_reply(&mut self, id: u32, parent_id: u32, author: &str, text: &str) {
+        self.push_comment(id, author, text, Some(parent_id), false);
+    }
+
+    /// Mark a comment (by id) as resolved/done.
+    pub fn resolve_comment(&mut self, id: u32) {
+        if let Some(c) = self.comments.iter_mut().find(|c| c.id == id) {
+            c.resolved = true;
+        }
+    }
+
+    fn push_comment(&mut self, id: u32, author: &str, text: &str, parent: Option<u32>, resolved: bool) {
+        if self.comments.is_empty() {
+            // Register the comments relationship once.
             self.package
                 .get_or_create_part_rels(&self.doc_part_name)
-                .add(
+                .add_if_absent(
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
                     "comments.xml",
                 );
-            Vec::new()
+        }
+        // Stable, unique paraId (8 hex digits) derived from the comment id.
+        let para_id = format!("{:08X}", 0x1000_0000u32.wrapping_add(id));
+        self.comments.push(CommentData {
+            id,
+            author: author.to_string(),
+            text: text.to_string(),
+            para_id,
+            parent,
+            resolved,
         });
-        comments.push(comment_xml);
     }
 
     /// Set a diagonal text watermark (e.g. "DRAFT", "CONFIDENTIAL") on every page.
@@ -3180,6 +3250,14 @@ impl Default for Document {
 }
 
 /// Guess image content type from the part name extension.
+/// Minimal XML text/attribute escaping for comment author/text.
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 fn guess_image_content_type(part_name: &str) -> String {
     let ext = part_name.rsplit('.').next().unwrap_or("").to_lowercase();
     match ext.as_str() {
@@ -3976,6 +4054,28 @@ mod tests {
         let app = reopened.app_properties.expect("app props present");
         assert_eq!(app.company.as_deref(), Some("Zavora"));
         assert_eq!(app.application.as_deref(), Some("zavora-docx"));
+    }
+
+    #[test]
+    fn threaded_comments_serialize() {
+        let mut doc = Document::new();
+        doc.add_paragraph("Body");
+        doc.add_comment(1, "Alice", "Question?");
+        doc.add_comment_reply(2, 1, "Bob", "Answer.");
+        doc.add_comment(3, "Alice", "Fix this.");
+        doc.resolve_comment(3);
+        let bytes = doc.to_bytes().expect("serialize");
+        // Re-open to confirm the package is structurally sound.
+        let _ = Document::from_bytes(&bytes).expect("open");
+        // Inspect the commentsExtended part via a fresh package read.
+        let pkg = OpcPackage::from_reader(std::io::Cursor::new(&bytes))
+            .expect("pkg");
+        let ext = pkg
+            .get_part("/word/commentsExtended.xml")
+            .expect("commentsExtended part");
+        let s = String::from_utf8(ext.to_vec()).unwrap();
+        assert!(s.contains("w15:paraIdParent"), "reply links parent: {s}");
+        assert!(s.contains(r#"w15:done="1""#), "resolved flag: {s}");
     }
 
     #[test]
