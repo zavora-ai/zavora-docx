@@ -357,7 +357,13 @@ impl Document {
     /// Append a block-level mathematical equation built from a [`MathNode`] tree.
     pub fn add_equation(&mut self, math: &rdocx_oxml::math::MathNode) {
         if let Ok(bytes) = math.to_omath_para_bytes() {
-            self.document.body.content.push(BodyContent::RawXml(bytes));
+            // Math is paragraph content (EG_PContent): wrap the oMathPara in a
+            // w:p, the way Word writes block equations. A bare oMathPara under
+            // w:body is schema-invalid and Word rejects the whole file.
+            let mut p = b"<w:p>".to_vec();
+            p.extend_from_slice(&bytes);
+            p.extend_from_slice(b"</w:p>");
+            self.document.body.content.push(BodyContent::RawXml(p));
         }
     }
 

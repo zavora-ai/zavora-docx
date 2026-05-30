@@ -86,6 +86,14 @@ impl CT_Sdt {
                 let mut ch = BytesStart::new("w14:checked");
                 ch.push_attribute(("w14:val", if *checked { "1" } else { "0" }));
                 w.write_event(Event::Empty(ch))?;
+                let mut cs = BytesStart::new("w14:checkedState");
+                cs.push_attribute(("w14:val", "2612"));
+                cs.push_attribute(("w14:font", "MS Gothic"));
+                w.write_event(Event::Empty(cs))?;
+                let mut us = BytesStart::new("w14:uncheckedState");
+                us.push_attribute(("w14:val", "2610"));
+                us.push_attribute(("w14:font", "MS Gothic"));
+                w.write_event(Event::Empty(us))?;
                 w.write_event(Event::End(BytesEnd::new("w14:checkbox")))?;
             }
         }
