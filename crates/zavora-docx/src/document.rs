@@ -46,6 +46,8 @@ pub struct Document {
     doc_part_name: String,
     /// Cached count of image media parts (avoids rescanning parts on each embed).
     image_counter: usize,
+    /// Typed document settings (new settings + round-trip of loaded settings.xml).
+    settings: rdocx_oxml::settings::CT_Settings,
 }
 
 impl Document {
@@ -75,6 +77,7 @@ impl Document {
             auto_hyphenation: false,
             doc_part_name: "/word/document.xml".to_string(),
             image_counter: 0,
+            settings: rdocx_oxml::settings::CT_Settings::default(),
         }
     }
 
@@ -158,6 +161,12 @@ impl Document {
             } else { None }
         } else { None };
 
+        // Load settings.xml (typed; unknown children preserved) for round-trip.
+        let settings = package
+            .get_part("/word/settings.xml")
+            .and_then(|xml| rdocx_oxml::settings::CT_Settings::from_xml(xml).ok())
+            .unwrap_or_default();
+
         Ok(Document {
             package,
             document,
@@ -167,12 +176,13 @@ impl Document {
             footnotes,
             endnotes,
             comments_xml: None,
-            protection_type: None,
-            update_fields: false,
-            even_odd_headers: false,
-            auto_hyphenation: false,
+            protection_type: settings.protection.clone(),
+            update_fields: settings.update_fields,
+            even_odd_headers: settings.even_odd_headers,
+            auto_hyphenation: settings.auto_hyphenation,
             doc_part_name,
             image_counter,
+            settings,
         })
     }
 
@@ -249,36 +259,18 @@ impl Document {
             );
         }
 
-        // Serialize settings.xml if we need protection, field recalc, even/odd headers, or hyphenation.
-        if self.protection_type.is_some()
-            || self.update_fields
-            || self.even_odd_headers
-            || self.auto_hyphenation
-        {
-            let update = if self.update_fields {
-                r#"<w:updateFields w:val="true"/>"#
-            } else {
-                ""
-            };
-            let even_odd = if self.even_odd_headers {
-                r#"<w:evenAndOddHeaders/>"#
-            } else {
-                ""
-            };
-            let hyphen = if self.auto_hyphenation {
-                r#"<w:autoHyphenation w:val="true"/>"#
-            } else {
-                ""
-            };
-            let prot = self
-                .protection_type
-                .as_ref()
-                .map(|p| format!(r#"<w:documentProtection w:edit="{p}" w:enforcement="1"/>"#))
-                .unwrap_or_default();
-            let xml = format!(
-                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{update}{even_odd}{hyphen}{prot}</w:settings>"#,
-            );
-            self.package.set_part("/word/settings.xml", xml.into_bytes());
+        // Serialize settings.xml via the typed model, merging the legacy bool
+        // fields/protection that other methods still toggle.
+        let mut settings = self.settings.clone();
+        settings.update_fields |= self.update_fields;
+        settings.even_odd_headers |= self.even_odd_headers;
+        settings.auto_hyphenation |= self.auto_hyphenation;
+        if settings.protection.is_none() {
+            settings.protection = self.protection_type.clone();
+        }
+        if !settings.is_empty() {
+            let xml = settings.to_bytes()?;
+            self.package.set_part("/word/settings.xml", xml);
             self.package.content_types.add_override(
                 "/word/settings.xml",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
@@ -702,6 +694,39 @@ impl Document {
     /// the large inter-word gaps that justified body text otherwise produces.
     pub fn set_auto_hyphenation(&mut self, val: bool) {
         self.auto_hyphenation = val;
+    }
+
+    /// Set the default tab stop width (the spacing of automatic tabs).
+    pub fn set_default_tab_stop(&mut self, width: Length) {
+        self.settings.default_tab_stop = Some(rdocx_oxml::units::Twips(width.to_twips()));
+    }
+
+    /// Enable mirror margins (inside/outside margins for double-sided printing).
+    pub fn set_mirror_margins(&mut self, val: bool) {
+        self.settings.mirror_margins = val;
+    }
+
+    /// Enable the track-changes (revisions) flag.
+    pub fn set_track_changes(&mut self, val: bool) {
+        self.settings.track_changes = val;
+    }
+
+    /// Set the document open zoom level as a percentage.
+    pub fn set_zoom(&mut self, percent: u32) {
+        self.settings.zoom_percent = Some(percent);
+    }
+
+    /// Force Word to recalculate fields (TOC, PAGEREF) when the document opens.
+    pub fn set_update_fields(&mut self) {
+        self.update_fields = true;
+    }
+
+    /// Set the default proofing/theme language (e.g. "en-US", "fr-FR").
+    pub fn set_document_language(&mut self, lang: &str) {
+        self.settings.theme_font_lang = Some(rdocx_oxml::settings::ThemeFontLang {
+            val: Some(lang.to_string()),
+            ..Default::default()
+        });
     }
 
     /// Set a professionally-styled running header: centered, italic, small-caps,
@@ -3763,5 +3788,27 @@ mod tests {
         let mut doc = Document::new();
         doc.add_paragraph("Just text.");
         assert!(doc.images().is_empty());
+    }
+
+    #[test]
+    fn settings_setters_serialize_and_round_trip() {
+        let mut doc = Document::new();
+        doc.add_paragraph("Body");
+        doc.set_mirror_margins(true);
+        doc.set_default_tab_stop(Length::twips(720));
+        doc.set_zoom(140);
+        doc.set_document_language("fr-FR");
+        let bytes = doc.to_bytes().expect("serialize");
+        let reopened = Document::from_bytes(&bytes).expect("open");
+        assert!(reopened.settings.mirror_margins);
+        assert_eq!(reopened.settings.zoom_percent, Some(140));
+        assert_eq!(
+            reopened.settings.default_tab_stop.map(|t| t.0),
+            Some(720)
+        );
+        assert_eq!(
+            reopened.settings.theme_font_lang.unwrap().val.as_deref(),
+            Some("fr-FR")
+        );
     }
 }
