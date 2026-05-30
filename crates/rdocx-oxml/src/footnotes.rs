@@ -2,6 +2,7 @@
 
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, Event};
 use quick_xml::{Reader, Writer};
+use std::io::Write;
 
 use crate::error::Result;
 use crate::namespace::{W_NS, matches_local_name};
@@ -20,6 +21,8 @@ pub struct CT_Footnote {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CT_Footnotes {
     pub footnotes: Vec<CT_Footnote>,
+    /// Mandatory separator/continuation items (id 0 and -1) preserved verbatim.
+    pub separators: Vec<Vec<u8>>,
 }
 
 #[allow(non_snake_case)]
@@ -27,6 +30,7 @@ impl CT_Footnotes {
     pub fn new() -> Self {
         CT_Footnotes {
             footnotes: Vec::new(),
+            separators: Vec::new(),
         }
     }
 
@@ -41,6 +45,7 @@ impl CT_Footnotes {
         reader.config_mut().trim_text(true);
 
         let mut footnotes = Vec::new();
+        let mut separators: Vec<Vec<u8>> = Vec::new();
         let mut buf = Vec::new();
 
         loop {
@@ -60,9 +65,9 @@ impl CT_Footnotes {
                             }
                         }
 
-                        // Skip separator/continuation footnotes (id 0 and -1)
+                        // Preserve separator/continuation items (id 0 and -1) verbatim.
                         if id <= 0 {
-                            reader.read_to_end_into(name, &mut Vec::new())?;
+                            separators.push(crate::raw_xml::capture_element(&mut reader, e)?);
                         } else {
                             let paragraphs = parse_footnote_content(&mut reader)?;
                             footnotes.push(CT_Footnote { id, paragraphs });
@@ -82,7 +87,10 @@ impl CT_Footnotes {
             buf.clear();
         }
 
-        Ok(CT_Footnotes { footnotes })
+        Ok(CT_Footnotes {
+            footnotes,
+            separators,
+        })
     }
 
     /// Serialize to XML bytes as footnotes.
@@ -111,6 +119,11 @@ impl CT_Footnotes {
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
         ));
         writer.write_event(Event::Start(start))?;
+
+        // Separator/continuation items must come first.
+        for raw in &self.separators {
+            writer.get_mut().write_all(raw)?;
+        }
 
         let mut buf = itoa::Buffer::new();
         for footnote in &self.footnotes {
@@ -233,6 +246,7 @@ mod tests {
                     paragraphs: vec![],
                 },
             ],
+            separators: vec![],
         };
         assert!(footnotes.get_by_id(1).is_some());
         assert!(footnotes.get_by_id(2).is_some());
@@ -258,6 +272,7 @@ mod tests {
                     paragraphs: vec![fn2_para],
                 },
             ],
+            separators: vec![],
         };
 
         let xml = footnotes.to_xml_footnotes().unwrap();
@@ -267,5 +282,18 @@ mod tests {
         assert_eq!(parsed.footnotes[0].paragraphs[0].text(), "First footnote.");
         assert_eq!(parsed.footnotes[1].id, 2);
         assert_eq!(parsed.footnotes[1].paragraphs[0].text(), "Second footnote.");
+    }
+
+    #[test]
+    fn preserves_separator_footnotes() {
+        // Word's mandatory separator (id 0) and continuation (id -1) items must
+        // survive a round-trip, or footnotes render without the separator line.
+        let xml = br#"<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote><w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote><w:footnote w:id="1"><w:p><w:r><w:t>Note.</w:t></w:r></w:p></w:footnote></w:footnotes>"#;
+        let parsed = CT_Footnotes::from_xml(xml).unwrap();
+        assert_eq!(parsed.footnotes.len(), 1);
+        assert_eq!(parsed.separators.len(), 2);
+        let out = String::from_utf8(parsed.to_xml_footnotes().unwrap()).unwrap();
+        assert!(out.contains("w:separator"), "separator lost: {out}");
+        assert!(out.contains("continuationSeparator"), "continuation lost: {out}");
     }
 }
