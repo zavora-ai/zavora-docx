@@ -3875,6 +3875,14 @@ mod tests {
         doc.add_paragraph("Formula:");
         doc.add_equation_latex(r"\frac{a}{b}^2");
         let bytes = doc.to_bytes().expect("serialize");
+        // Regression guard: block equations MUST be wrapped in <w:p>. A bare
+        // <m:oMathPara> under <w:body> violates the WML content model and Word
+        // rejects the whole file (xmllint cannot catch this).
+        let doc_xml = String::from_utf8(doc.document.to_xml().unwrap()).unwrap();
+        assert!(
+            doc_xml.contains("<w:p><m:oMathPara"),
+            "oMathPara must be wrapped in w:p: {doc_xml}"
+        );
         let reopened = Document::from_bytes(&bytes).expect("open");
         // The oMathPara is preserved as raw body content across the round-trip.
         assert!(reopened.content_count() >= 2);
