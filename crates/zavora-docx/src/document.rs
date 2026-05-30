@@ -65,6 +65,12 @@ pub struct Document {
     settings: rdocx_oxml::settings::CT_Settings,
     /// Extended properties (docProps/app.xml).
     app_properties: Option<rdocx_oxml::app_properties::AppProperties>,
+    /// Fonts to embed: (family name, raw TTF/OTF bytes).
+    embedded_fonts: Vec<(String, Vec<u8>)>,
+    /// Building blocks / Quick Parts (name, content text) for glossary/document.xml.
+    building_blocks: Vec<(String, String)>,
+    /// Custom XML data parts (raw XML strings) for customXml/itemN.xml.
+    custom_xml: Vec<String>,
 }
 
 impl Document {
@@ -96,6 +102,9 @@ impl Document {
             image_counter: 0,
             settings: rdocx_oxml::settings::CT_Settings::default(),
             app_properties: None,
+            embedded_fonts: Vec::new(),
+            building_blocks: Vec::new(),
+            custom_xml: Vec::new(),
         }
     }
 
@@ -207,6 +216,9 @@ impl Document {
             image_counter,
             settings,
             app_properties,
+            embedded_fonts: Vec::new(),
+            building_blocks: Vec::new(),
+            custom_xml: Vec::new(),
         })
     }
 
@@ -238,16 +250,38 @@ impl Document {
         // Emit a fontTable.xml part declaring common fonts (real Word docs always
         // ship one; some consumers expect it). Idempotent across saves.
         if self.package.get_part("/word/fontTable.xml").is_none() {
-            let ft = concat!(
+            let mut ft = String::from(concat!(
                 r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
-                r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
                 r#"<w:font w:name="Calibri"><w:family w:val="swiss"/><w:pitch w:val="variable"/></w:font>"#,
                 r#"<w:font w:name="Times New Roman"><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>"#,
                 r#"<w:font w:name="Cambria"><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>"#,
                 r#"<w:font w:name="Courier New"><w:family w:val="mod4"/><w:pitch w:val="fixed"/></w:font>"#,
-                r#"</w:fonts>"#,
+            ));
+
+            // Embedded fonts: obfuscated (.odttf) binary parts + embedRegular refs.
+            let embedded = std::mem::take(&mut self.embedded_fonts);
+            for (i, (name, data)) in embedded.iter().enumerate() {
+                let guid = format!("00000000-0000-0000-0000-{:012X}", i + 1);
+                let odttf = obfuscate_odttf(data, &guid);
+                let part = format!("/word/fonts/font{}.odttf", i + 1);
+                self.package.set_part(&part, odttf);
+                let rel_id = self.package.get_or_create_part_rels("/word/fontTable.xml").add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+                    &format!("fonts/font{}.odttf", i + 1),
+                );
+                ft.push_str(&format!(
+                    r#"<w:font w:name="{}"><w:embedRegular r:id="{}" w:fontKey="{{{}}}"/></w:font>"#,
+                    xml_escape(name), rel_id, guid
+                ));
+            }
+            self.package.content_types.add_default(
+                "odttf",
+                "application/vnd.openxmlformats-officedocument.obfuscatedFont",
             );
-            self.package.set_part("/word/fontTable.xml", ft.as_bytes().to_vec());
+
+            ft.push_str("</w:fonts>");
+            self.package.set_part("/word/fontTable.xml", ft.into_bytes());
             self.package.content_types.add_override(
                 "/word/fontTable.xml",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
@@ -360,6 +394,34 @@ impl Document {
                     "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
                     "commentsExtended.xml",
                 );
+
+            // people.xml — unique comment authors (w15:person), referenced by
+            // commentsExtended consumers for author identity.
+            let mut authors: Vec<&str> = Vec::new();
+            for c in &self.comments {
+                if !authors.contains(&c.author.as_str()) {
+                    authors.push(&c.author);
+                }
+            }
+            let mut ppl = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w15:people xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">"#);
+            for a in &authors {
+                ppl.push_str(&format!(
+                    r#"<w15:person w15:author="{a}"><w15:presenceInfo w15:providerId="None" w15:userId="{a}"/></w15:person>"#,
+                    a = xml_escape(a)
+                ));
+            }
+            ppl.push_str("</w15:people>");
+            self.package.set_part("/word/people.xml", ppl.into_bytes());
+            self.package.content_types.add_override(
+                "/word/people.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml",
+            );
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add_if_absent(
+                    "http://schemas.microsoft.com/office/2011/relationships/people",
+                    "people.xml",
+                );
         }
 
         // Serialize settings.xml via the typed model, merging the legacy bool
@@ -384,6 +446,74 @@ impl Document {
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
                     "settings.xml",
                 );
+        }
+
+        // Glossary document (building blocks / Quick Parts).
+        if !self.building_blocks.is_empty()
+            && self.package.get_part("/word/glossary/document.xml").is_none()
+        {
+            let mut g = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:glossaryDocument xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docParts>"#);
+            for (i, (name, content)) in self.building_blocks.iter().enumerate() {
+                let guid = format!("00000000-0000-0000-0000-{:012X}", i + 1);
+                g.push_str(&format!(
+                    concat!(
+                        r#"<w:docPart><w:docPartPr><w:name w:val="{name}"/>"#,
+                        r#"<w:guid w:val="{{{guid}}}"/><w:category><w:name w:val="General"/>"#,
+                        r#"<w:gallery w:val="placeholder"/></w:category></w:docPartPr>"#,
+                        r#"<w:docPartBody><w:p><w:r><w:t xml:space="preserve">{content}</w:t></w:r></w:p></w:docPartBody></w:docPart>"#,
+                    ),
+                    name = xml_escape(name),
+                    guid = guid,
+                    content = xml_escape(content)
+                ));
+            }
+            g.push_str("</w:docParts></w:glossaryDocument>");
+            self.package.set_part("/word/glossary/document.xml", g.into_bytes());
+            self.package.content_types.add_override(
+                "/word/glossary/document.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml",
+            );
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add_if_absent(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument",
+                    "glossary/document.xml",
+                );
+        }
+
+        // Custom XML data parts (+ datastore itemProps for data binding).
+        if !self.custom_xml.is_empty()
+            && self.package.get_part("/customXml/item1.xml").is_none()
+        {
+            for (i, xml) in self.custom_xml.iter().enumerate() {
+                let n = i + 1;
+                let guid = format!("00000000-0000-0000-0000-{:012X}", n);
+                self.package
+                    .set_part(&format!("/customXml/item{n}.xml"), xml.as_bytes().to_vec());
+                let props = format!(
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><ds:datastoreItem ds:itemID="{{{guid}}}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"><ds:schemaRefs/></ds:datastoreItem>"#
+                );
+                self.package
+                    .set_part(&format!("/customXml/itemProps{n}.xml"), props.into_bytes());
+                self.package.content_types.add_override(
+                    &format!("/customXml/itemProps{n}.xml"),
+                    "application/vnd.openxmlformats-officedocument.customXmlProperties+xml",
+                );
+                // itemN.xml -> itemPropsN.xml relationship.
+                self.package
+                    .get_or_create_part_rels(&format!("/customXml/item{n}.xml"))
+                    .add_if_absent(
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
+                        &format!("itemProps{n}.xml"),
+                    );
+                // document -> customXml/itemN.xml relationship.
+                self.package
+                    .get_or_create_part_rels(&self.doc_part_name)
+                    .add_if_absent(
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+                        &format!("../customXml/item{n}.xml"),
+                    );
+            }
         }
 
         Ok(())
@@ -1914,6 +2044,25 @@ impl Document {
         self.ensure_app_properties().company = Some(company.to_string());
     }
 
+    /// Embed a font in the document so it travels with the file. `data` is the
+    /// raw TTF/OTF bytes; `family` is the font name as referenced in styles.
+    /// Stored obfuscated (.odttf) per the OOXML embedded-font scheme.
+    pub fn embed_font(&mut self, family: &str, data: &[u8]) {
+        self.embedded_fonts.push((family.to_string(), data.to_vec()));
+    }
+
+    /// Add a reusable building block (Quick Part) by name with plain-text
+    /// content, stored in the glossary document.
+    pub fn add_building_block(&mut self, name: &str, content: &str) {
+        self.building_blocks.push((name.to_string(), content.to_string()));
+    }
+
+    /// Attach a custom XML data part (arbitrary XML) to the document, with a
+    /// datastore itemProps part so consumers can data-bind to it.
+    pub fn add_custom_xml(&mut self, xml: &str) {
+        self.custom_xml.push(xml.to_string());
+    }
+
     // ---- Footnotes & Endnotes ----
 
     /// Create a hyperlink relationship for an external URL. Returns the relationship ID.
@@ -3442,6 +3591,28 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 /// Deobfuscate an ODTTF (obfuscated TrueType) font file.
 ///
 /// Word embeds fonts as `.odttf` files where the first 32 bytes are XOR'd
+/// Obfuscate raw font bytes into the OOXML `.odttf` form using a GUID string
+/// like "00000000-0000-0000-0000-000000000001". XOR is symmetric, so this is
+/// the inverse of `deobfuscate_odttf`.
+fn obfuscate_odttf(data: &[u8], guid_str: &str) -> Vec<u8> {
+    let hex: String = guid_str.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+    let mut guid = [0u8; 16];
+    if hex.len() == 32 {
+        for (i, byte) in guid.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap_or(0);
+        }
+    }
+    let key: [u8; 16] = [
+        guid[3], guid[2], guid[1], guid[0], guid[5], guid[4], guid[7], guid[6], guid[8], guid[9],
+        guid[10], guid[11], guid[12], guid[13], guid[14], guid[15],
+    ];
+    let mut result = data.to_vec();
+    for i in 0..32.min(result.len()) {
+        result[i] ^= key[i % 16];
+    }
+    result
+}
+
 /// with a 16-byte GUID derived from the file name. The file name follows
 /// the pattern `{GUID}.odttf` where GUID is a hex string without hyphens.
 fn deobfuscate_odttf(data: &[u8], file_name: &str) -> Option<Vec<u8>> {
@@ -4105,6 +4276,46 @@ mod tests {
     }
 
     #[test]
+    fn glossary_and_custom_xml_parts() {
+        let mut doc = Document::new();
+        doc.add_paragraph("Body");
+        doc.add_building_block("Disclaimer", "All rights reserved.");
+        doc.add_custom_xml(r#"<root><item key="a">1</item></root>"#);
+        let bytes = doc.to_bytes().expect("serialize");
+        let reopened = Document::from_bytes(&bytes).expect("reopen");
+        let g = reopened.package.get_part("/word/glossary/document.xml").expect("glossary");
+        let gs = String::from_utf8(g.to_vec()).unwrap();
+        assert!(gs.contains(r#"w:val="Disclaimer""#), "block name: {gs}");
+        assert!(gs.contains("All rights reserved."), "block body: {gs}");
+        assert!(reopened.package.get_part("/customXml/item1.xml").is_some());
+        assert!(reopened.package.get_part("/customXml/itemProps1.xml").is_some());
+    }
+
+    #[test]
+    fn obfuscate_odttf_is_reversible() {
+        let font: Vec<u8> = (0..64u8).collect();
+        let guid = "00000000-0000-0000-0000-000000000001";
+        let obf = obfuscate_odttf(&font, guid);
+        // First 32 bytes changed, rest identical.
+        assert_ne!(&obf[..32], &font[..32]);
+        assert_eq!(&obf[32..], &font[32..]);
+        // Deobfuscate (file-name form) restores the original.
+        let restored = deobfuscate_odttf(&obf, "00000000-0000-0000-0000-000000000001.odttf").unwrap();
+        assert_eq!(restored, font);
+    }
+
+    #[test]
+    fn embed_font_produces_obfuscated_part() {
+        let mut doc = Document::new();
+        doc.add_paragraph("Body");
+        doc.embed_font("MyFont", &(0..200u8).collect::<Vec<u8>>());
+        let bytes = doc.to_bytes().expect("serialize");
+        let reopened = Document::from_bytes(&bytes).expect("reopen");
+        // The obfuscated font part must be present after round-trip.
+        assert!(reopened.package.get_part("/word/fonts/font1.odttf").is_some());
+    }
+
+    #[test]
     fn threaded_comments_serialize() {
         let mut doc = Document::new();
         doc.add_paragraph("Body");
@@ -4124,6 +4335,11 @@ mod tests {
         let s = String::from_utf8(ext.to_vec()).unwrap();
         assert!(s.contains("w15:paraIdParent"), "reply links parent: {s}");
         assert!(s.contains(r#"w15:done="1""#), "resolved flag: {s}");
+        // people.xml lists unique comment authors.
+        let people = pkg.get_part("/word/people.xml").expect("people part");
+        let ps = String::from_utf8(people.to_vec()).unwrap();
+        assert!(ps.contains(r#"w15:author="Alice""#), "Alice author: {ps}");
+        assert!(ps.contains(r#"w15:author="Bob""#), "Bob author: {ps}");
     }
 
     #[test]

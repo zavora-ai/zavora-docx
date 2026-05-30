@@ -741,13 +741,29 @@ impl CT_Document {
 
     /// Serialize to XML bytes.
     pub fn to_xml(&self) -> Result<Vec<u8>> {
-        let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
+        // Serialize the body (and background) first into a buffer so we can scan
+        // which optional namespaces are actually used and declare only those.
+        let mut body_buf = Writer::new_with_indent(Vec::new(), b' ', 2);
+        if let Some(ref bg) = self.background_xml {
+            body_buf.get_mut().extend_from_slice(bg);
+        }
+        self.body.to_xml(&mut body_buf)?;
+        let body_bytes = body_buf.into_inner();
 
-        writer.write_event(Event::Decl(BytesDecl::new(
-            "1.0",
-            Some("UTF-8"),
-            Some("yes"),
-        )))?;
+        // Detect prefix usage in the body (element or attribute prefixes).
+        let used = |prefix: &str| -> bool {
+            let open = format!("<{prefix}:");
+            let attr = format!(" {prefix}:");
+            let xmlns = format!("xmlns:{prefix}=");
+            body_bytes
+                .windows(open.len())
+                .any(|w| w == open.as_bytes())
+                || body_bytes.windows(attr.len()).any(|w| w == attr.as_bytes())
+                || body_bytes.windows(xmlns.len()).any(|w| w == xmlns.as_bytes())
+        };
+
+        let mut writer = Writer::new(Vec::new());
+        writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), Some("yes"))))?;
 
         let mut doc_start = BytesStart::new("w:document");
         doc_start.push_attribute(("xmlns:w", W_NS));
@@ -760,38 +776,44 @@ impl CT_Document {
             "http://schemas.openxmlformats.org/markup-compatibility/2006",
         ));
 
-        // Always emit xmlns:wp for drawing elements
-        let wp_ns = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
-        let mut has_wp = false;
-        for (key, _) in &self.extra_namespaces {
-            if key == "xmlns:wp" {
-                has_wp = true;
-                break;
+        // Track which extra namespaces were already declared (to avoid dupes).
+        let extra_keys: std::collections::HashSet<&str> =
+            self.extra_namespaces.iter().map(|(k, _)| k.as_str()).collect();
+
+        // Conditionally declare optional namespaces only when the body uses them.
+        let optional: &[(&str, &str, &str)] = &[
+            ("wp", "xmlns:wp", "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"),
+            ("a", "xmlns:a", "http://schemas.openxmlformats.org/drawingml/2006/main"),
+            ("w14", "xmlns:w14", "http://schemas.microsoft.com/office/word/2010/wordml"),
+            ("m", "xmlns:m", "http://schemas.openxmlformats.org/officeDocument/2006/math"),
+            ("wps", "xmlns:wps", "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"),
+            ("c", "xmlns:c", "http://schemas.openxmlformats.org/drawingml/2006/chart"),
+        ];
+        let mut declared_w14 = false;
+        for (prefix, key, ns) in optional {
+            if extra_keys.contains(*key) {
+                if *prefix == "w14" { declared_w14 = true; }
+                continue; // will be replayed below
+            }
+            if used(prefix) {
+                doc_start.push_attribute((*key, *ns));
+                if *prefix == "w14" { declared_w14 = true; }
             }
         }
-        if !has_wp {
-            doc_start.push_attribute(("xmlns:wp", wp_ns));
-        }
 
-        // Replay captured extra namespaces
+        // Replay captured extra namespaces (from a loaded document).
         for (key, val) in &self.extra_namespaces {
             doc_start.push_attribute((key.as_str(), val.as_str()));
+            if key == "xmlns:w14" { declared_w14 = true; }
         }
 
-        // Always add w14 namespace for text effects and mc:Ignorable for compatibility
-        doc_start.push_attribute(("xmlns:w14", "http://schemas.microsoft.com/office/word/2010/wordml"));
-        doc_start.push_attribute(("xmlns:m", "http://schemas.openxmlformats.org/officeDocument/2006/math"));
-        doc_start.push_attribute(("mc:Ignorable", "w14"));
+        // mc:Ignorable lists the markup-compatibility-ignorable prefixes present.
+        if declared_w14 {
+            doc_start.push_attribute(("mc:Ignorable", "w14"));
+        }
 
         writer.write_event(Event::Start(doc_start))?;
-
-        // Write background element if present
-        if let Some(ref bg) = self.background_xml {
-            writer.get_mut().extend_from_slice(bg);
-        }
-
-        self.body.to_xml(&mut writer)?;
-
+        writer.get_mut().extend_from_slice(&body_bytes);
         writer.write_event(Event::End(BytesEnd::new("w:document")))?;
 
         Ok(writer.into_inner())
@@ -1048,16 +1070,25 @@ mod tests {
 
     #[test]
     fn root_namespaces_not_duplicated_on_round_trip() {
-        // Regression: w14/m/wp are always emitted on the root. If also captured
-        // into extra_namespaces on parse, re-serialization duplicates the xmlns
-        // attribute and Word rejects the file. Parse a doc that already declares
-        // them, then re-serialize: each must appear exactly once.
+        // Regression + conditional registry: optional namespaces are declared at
+        // most once (never duplicated), and only when actually used by the body.
         let src = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body><w:p/></w:body></w:document>"#;
         let parsed = CT_Document::from_xml(src.as_bytes()).unwrap();
         let s = String::from_utf8(parsed.to_xml().unwrap()).unwrap();
         for ns in ["xmlns:w14=", "xmlns:m=", "xmlns:wp="] {
-            assert_eq!(s.matches(ns).count(), 1, "{ns} duplicated: {s}");
+            assert!(s.matches(ns).count() <= 1, "{ns} duplicated: {s}");
         }
+
+        // A body that uses m: (math) must get xmlns:m declared exactly once.
+        let math_src = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p></w:body></w:document>"#;
+        let parsed2 = CT_Document::from_xml(math_src.as_bytes()).unwrap();
+        let s2 = String::from_utf8(parsed2.to_xml().unwrap()).unwrap();
+        assert_eq!(s2.matches("xmlns:m=").count(), 1, "math ns missing/dup: {s2}");
+        // ...and a plain text-only body must NOT declare xmlns:m.
+        let plain = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hi</w:t></w:r></w:p></w:body></w:document>"#;
+        let parsed3 = CT_Document::from_xml(plain.as_bytes()).unwrap();
+        let s3 = String::from_utf8(parsed3.to_xml().unwrap()).unwrap();
+        assert_eq!(s3.matches("xmlns:m=").count(), 0, "math ns leaked: {s3}");
     }
 }
