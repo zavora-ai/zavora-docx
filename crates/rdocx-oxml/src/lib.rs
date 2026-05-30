@@ -23,6 +23,7 @@ pub mod numbering;
 pub mod placeholder;
 pub mod properties;
 pub mod raw_xml;
+pub mod sdt;
 pub mod settings;
 pub mod shared;
 pub mod styles;

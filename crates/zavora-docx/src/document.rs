@@ -335,6 +335,21 @@ impl Document {
         }
     }
 
+    /// Append a content control (structured document tag). `placeholder` is the
+    /// display text shown inside the control.
+    pub fn add_content_control(
+        &mut self,
+        kind: rdocx_oxml::sdt::SdtKind,
+        tag: &str,
+        placeholder: Option<&str>,
+    ) {
+        let mut sdt = rdocx_oxml::sdt::CT_Sdt::new(kind, tag);
+        sdt.text = placeholder.map(|s| s.to_string());
+        if let Ok(bytes) = sdt.to_bytes() {
+            self.document.body.content.push(BodyContent::RawXml(bytes));
+        }
+    }
+
     /// Get the number of paragraphs.
     pub fn paragraph_count(&self) -> usize {
         self.document.body.paragraphs().count()
