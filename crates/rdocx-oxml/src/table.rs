@@ -287,6 +287,8 @@ pub struct CT_TblPr {
     pub shading: Option<CT_Shd>,
     /// "Look" flags for conditional formatting (firstRow, lastRow, etc.)
     pub look: Option<String>,
+    /// Unknown table-property children preserved for round-trip (tblpPr, tblCaption, …).
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -315,10 +317,14 @@ impl CT_TblPr {
                         pr.indent = Some(CT_TblWidth::from_xml_attrs(e)?);
                     } else if matches_local_name(name.as_ref(), b"shd") {
                         pr.shading = Some(CT_Shd::from_xml_attrs(e)?);
-                    } else if matches_local_name(name.as_ref(), b"tblLook")
-                        && let Some(val) = get_val_attr(e)?
-                    {
-                        pr.look = Some(val);
+                    } else if matches_local_name(name.as_ref(), b"tblLook") {
+                        if let Some(val) = get_val_attr(e)? {
+                            pr.look = Some(val);
+                        }
+                    } else {
+                        pr.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::Start(ref e)) => {
@@ -328,7 +334,9 @@ impl CT_TblPr {
                     } else if matches_local_name(name.as_ref(), b"tblCellMar") {
                         pr.cell_margin = Some(CT_TblCellMar::from_xml(reader)?);
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        pr.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_element(reader, e)?);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"tblPr") => {
@@ -391,6 +399,12 @@ impl CT_TblPr {
             let mut e = BytesStart::new("w:tblLook");
             e.push_attribute(("w:val", look.as_str()));
             writer.write_event(Event::Empty(e))?;
+        }
+
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
         }
 
         writer.write_event(Event::End(BytesEnd::new("w:tblPr")))?;
@@ -616,6 +630,8 @@ pub struct CT_TcPr {
     pub no_wrap: Option<bool>,
     /// Text direction
     pub text_direction: Option<String>,
+    /// Unknown cell-property children preserved for round-trip (tcMar, hideMark, …).
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -653,10 +669,14 @@ impl CT_TcPr {
                         pr.shading = Some(CT_Shd::from_xml_attrs(e)?);
                     } else if matches_local_name(name.as_ref(), b"noWrap") {
                         pr.no_wrap = Some(true);
-                    } else if matches_local_name(name.as_ref(), b"textDirection")
-                        && let Some(val) = get_val_attr(e)?
-                    {
-                        pr.text_direction = Some(val);
+                    } else if matches_local_name(name.as_ref(), b"textDirection") {
+                        if let Some(val) = get_val_attr(e)? {
+                            pr.text_direction = Some(val);
+                        }
+                    } else {
+                        pr.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::Start(ref e)) => {
@@ -664,7 +684,9 @@ impl CT_TcPr {
                     if matches_local_name(name.as_ref(), b"tcBorders") {
                         pr.borders = Some(CT_TblBorders::from_xml(reader)?);
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        pr.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_element(reader, e)?);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"tcPr") => {
@@ -735,6 +757,12 @@ impl CT_TcPr {
             writer.write_event(Event::Empty(e))?;
         }
 
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
+        }
+
         writer.write_event(Event::End(BytesEnd::new("w:tcPr")))?;
         Ok(())
     }
@@ -748,6 +776,7 @@ impl CT_TcPr {
             && self.v_align.is_none()
             && self.no_wrap.is_none()
             && self.text_direction.is_none()
+            && self.extra_xml.is_none()
     }
 }
 
@@ -1040,6 +1069,19 @@ mod tests {
             buf.clear();
         }
         CT_Tbl::from_xml(&mut reader).unwrap()
+    }
+
+    #[test]
+    fn table_preserves_unknown_properties() {
+        // tblCaption (tblPr) and hideMark (tcPr) are real elements we don't model.
+        let tbl = parse_table(
+            r#"<w:tblPr><w:tblStyle w:val="Grid"/><w:tblCaption w:val="Sales"/></w:tblPr><w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:hideMark/></w:tcPr><w:p/></w:tc></w:tr>"#,
+        );
+        let mut w = Writer::new(Vec::new());
+        tbl.to_xml(&mut w).unwrap();
+        let out = String::from_utf8(w.into_inner()).unwrap();
+        assert!(out.contains("w:tblCaption"), "tblCaption lost: {out}");
+        assert!(out.contains("w:hideMark"), "hideMark lost: {out}");
     }
 
     #[test]

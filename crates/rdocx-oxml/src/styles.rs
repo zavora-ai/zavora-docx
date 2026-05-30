@@ -49,6 +49,9 @@ pub struct CT_Style {
     pub is_default: bool,
     pub ppr: Option<CT_PPr>,
     pub rpr: Option<CT_RPr>,
+    /// Unknown style children (uiPriority, semiHidden, qFormat, link, rsid, …)
+    /// preserved verbatim for round-trip fidelity.
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -76,6 +79,7 @@ impl CT_Style {
         let mut next_style = None;
         let mut ppr = None;
         let mut rpr = None;
+        let mut extra_xml: Option<Vec<Vec<u8>>> = None;
         let mut buf = Vec::new();
 
         loop {
@@ -88,6 +92,10 @@ impl CT_Style {
                         based_on = get_val_attr(e)?;
                     } else if matches_local_name(ename.as_ref(), b"next") {
                         next_style = get_val_attr(e)?;
+                    } else {
+                        extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::Start(ref e)) => {
@@ -97,7 +105,9 @@ impl CT_Style {
                     } else if matches_local_name(ename.as_ref(), b"rPr") {
                         rpr = Some(CT_RPr::from_xml(reader)?);
                     } else {
-                        reader.read_to_end_into(ename, &mut Vec::new())?;
+                        extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_element(reader, e)?);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"style") => {
@@ -119,6 +129,7 @@ impl CT_Style {
             is_default,
             ppr,
             rpr,
+            extra_xml,
         })
     }
 
@@ -147,6 +158,13 @@ impl CT_Style {
             let mut ne = BytesStart::new("w:next");
             ne.push_attribute(("w:val", next.as_str()));
             writer.write_event(Event::Empty(ne))?;
+        }
+
+        // Preserved unknown style children (uiPriority, semiHidden, qFormat, …).
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
         }
 
         if let Some(ref ppr) = self.ppr {
@@ -413,6 +431,7 @@ impl CT_Styles {
             is_default: false,
             ppr,
             rpr,
+            extra_xml: None,
         };
 
         let normal = CT_Style {
@@ -424,6 +443,7 @@ impl CT_Styles {
             is_default: true,
             ppr: None,
             rpr: None,
+            extra_xml: None,
         };
 
         // Title: large, no outline level (it's the doc title, not a heading)
@@ -558,5 +578,16 @@ mod tests {
         let styles = CT_Styles::new_default();
         let default_para = styles.get_default(StyleType::Paragraph).unwrap();
         assert_eq!(default_para.style_id, "Normal");
+    }
+
+    #[test]
+    fn style_preserves_unknown_children() {
+        // uiPriority/qFormat (empty) and a link are common style children we don't model.
+        let xml = br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:uiPriority w:val="29"/><w:qFormat/><w:link w:val="QuoteChar"/></w:style></w:styles>"#;
+        let parsed = CT_Styles::from_xml(xml).unwrap();
+        let out = String::from_utf8(parsed.to_xml().unwrap()).unwrap();
+        assert!(out.contains("w:uiPriority"), "uiPriority lost: {out}");
+        assert!(out.contains("w:qFormat"), "qFormat lost: {out}");
+        assert!(out.contains(r#"w:val="QuoteChar""#), "link lost: {out}");
     }
 }
