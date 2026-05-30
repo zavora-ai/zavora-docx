@@ -2929,6 +2929,30 @@ impl Document {
         rdocx_html::to_markdown(&input)
     }
 
+    /// Extract all text in document order, including table cell text (each cell
+    /// on its own line). Paragraphs and tables stay interleaved as they appear.
+    pub fn to_plain_text(&self) -> String {
+        let mut out = String::new();
+        for content in &self.document.body.content {
+            match content {
+                BodyContent::Paragraph(p) => {
+                    out.push_str(&p.text());
+                    out.push('\n');
+                }
+                BodyContent::Table(tbl) => {
+                    for row in &tbl.rows {
+                        for cell in &row.cells {
+                            out.push_str(&cell.text());
+                            out.push('\n');
+                        }
+                    }
+                }
+                BodyContent::RawXml(_) => {}
+            }
+        }
+        out
+    }
+
     /// Build an HtmlInput from the document's current state.
     fn build_html_input(&self) -> rdocx_html::HtmlInput {
         use rdocx_opc::relationship::rel_types;

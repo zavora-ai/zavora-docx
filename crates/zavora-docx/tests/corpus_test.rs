@@ -105,3 +105,22 @@ fn layout_primitives_column_widths_and_tab() {
     let reopened = Document::from_bytes(&bytes).expect("reopen");
     assert!(reopened.content_count() >= 2);
 }
+
+#[test]
+fn to_plain_text_includes_table_cells_in_order() {
+    let mut doc = Document::new();
+    doc.add_paragraph("Before table");
+    let mut t = doc.add_table(1, 2);
+    if let Some(mut c) = t.cell(0, 0) { c.set_text("R0C0"); }
+    if let Some(mut c) = t.cell(0, 1) { c.set_text("R0C1"); }
+    doc.add_paragraph("After table");
+    let text = doc.to_plain_text();
+    for needle in ["Before table", "R0C0", "R0C1", "After table"] {
+        assert!(text.contains(needle), "missing {needle}: {text}");
+    }
+    // Document order preserved: paragraph, then cells, then paragraph.
+    let before = text.find("Before table").unwrap();
+    let cell = text.find("R0C0").unwrap();
+    let after = text.find("After table").unwrap();
+    assert!(before < cell && cell < after, "out of order: {text}");
+}
