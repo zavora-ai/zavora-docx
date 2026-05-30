@@ -33,6 +33,8 @@ struct CommentData {
     /// Parent comment id for replies (None = top-level).
     parent: Option<u32>,
     resolved: bool,
+    /// Body paragraph index where this comment is anchored (for placing replies).
+    anchor_para: Option<usize>,
 }
 
 /// A Word document (.docx file).
@@ -1909,6 +1911,29 @@ impl Document {
     /// Add a threaded reply to an existing comment.
     pub fn add_comment_reply(&mut self, id: u32, parent_id: u32, author: &str, text: &str) {
         self.push_comment(id, author, text, Some(parent_id), false);
+        // A reply must also be anchored in the body (Word hides comments with
+        // no commentReference). Place its reference at the parent's anchor.
+        if let Some(anchor) = self
+            .comments
+            .iter()
+            .find(|c| c.id == parent_id)
+            .and_then(|c| c.anchor_para)
+        {
+            if let Some(mut para) = self.paragraph_mut(anchor) {
+                para.comment_reference(id);
+            }
+            if let Some(c) = self.comments.iter_mut().find(|c| c.id == id) {
+                c.anchor_para = Some(anchor);
+            }
+        }
+    }
+
+    /// Record the body paragraph where a comment id is anchored, so replies can
+    /// be placed at the same location.
+    pub fn set_comment_anchor(&mut self, id: u32, para_index: usize) {
+        if let Some(c) = self.comments.iter_mut().find(|c| c.id == id) {
+            c.anchor_para = Some(para_index);
+        }
     }
 
     /// Mark a comment (by id) as resolved/done.
@@ -1937,6 +1962,7 @@ impl Document {
             para_id,
             parent,
             resolved,
+            anchor_para: None,
         });
     }
 

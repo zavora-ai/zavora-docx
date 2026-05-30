@@ -199,6 +199,16 @@ impl<'a> Paragraph<'a> {
         self.inner.extra_xml.push((self.inner.runs.len(), ref_xml.into_bytes()));
     }
 
+    /// Insert only a comment reference run (no range) — used to anchor a reply
+    /// comment at its parent's location so Word displays it in the thread.
+    pub fn comment_reference(&mut self, id: u32) {
+        let ref_xml = format!(
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="{}"/></w:r>"#,
+            id
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), ref_xml.into_bytes()));
+    }
+
     /// Add a tracked insertion (text shown as added in review mode).
     pub fn add_tracked_insert(&mut self, text: &str, author: &str) {
         let xml = format!(
