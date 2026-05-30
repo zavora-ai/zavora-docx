@@ -492,6 +492,8 @@ pub struct CT_TrPr {
     pub jc: Option<ST_Jc>,
     /// Allow row to break across pages
     pub cant_split: Option<bool>,
+    /// Unknown row-property children preserved for round-trip (trPrChange, …).
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -523,7 +525,16 @@ impl CT_TrPr {
                         }
                     } else if matches_local_name(name.as_ref(), b"cantSplit") {
                         pr.cant_split = Some(true);
+                    } else {
+                        pr.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_empty_element(e)?);
                     }
+                }
+                Ok(Event::Start(ref e)) => {
+                    pr.extra_xml
+                        .get_or_insert_with(Vec::new)
+                        .push(crate::raw_xml::capture_element(reader, e)?);
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"trPr") => {
                     break;
@@ -571,6 +582,12 @@ impl CT_TrPr {
             writer.write_event(Event::Empty(e))?;
         }
 
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
+        }
+
         writer.write_event(Event::End(BytesEnd::new("w:trPr")))?;
         Ok(())
     }
@@ -580,6 +597,7 @@ impl CT_TrPr {
             && self.header.is_none()
             && self.jc.is_none()
             && self.cant_split.is_none()
+            && self.extra_xml.is_none()
     }
 }
 

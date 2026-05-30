@@ -70,6 +70,8 @@ pub struct CT_Lvl {
     pub ppr: Option<CT_PPr>,
     /// Run properties for the numbering symbol
     pub rpr: Option<CT_RPr>,
+    /// Unknown level children preserved for round-trip (suff, lvlRestart, pStyle, …).
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -83,6 +85,7 @@ impl CT_Lvl {
             lvl_jc: None,
             ppr: None,
             rpr: None,
+            extra_xml: None,
         }
     }
 
@@ -99,7 +102,9 @@ impl CT_Lvl {
                     } else if matches_local_name(name.as_ref(), b"rPr") {
                         lvl.rpr = Some(CT_RPr::from_xml(reader)?);
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        lvl.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_element(reader, e)?);
                     }
                 }
                 Ok(Event::Empty(ref e)) => {
@@ -114,10 +119,14 @@ impl CT_Lvl {
                         }
                     } else if matches_local_name(name.as_ref(), b"lvlText") {
                         lvl.lvl_text = get_val_attr(e)?;
-                    } else if matches_local_name(name.as_ref(), b"lvlJc")
-                        && let Some(val) = get_val_attr(e)?
-                    {
-                        lvl.lvl_jc = Some(ST_Jc::from_str(&val)?);
+                    } else if matches_local_name(name.as_ref(), b"lvlJc") {
+                        if let Some(val) = get_val_attr(e)? {
+                            lvl.lvl_jc = Some(ST_Jc::from_str(&val)?);
+                        }
+                    } else {
+                        lvl.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"lvl") => {
@@ -163,6 +172,12 @@ impl CT_Lvl {
             writer.write_event(Event::Empty(e))?;
         }
 
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
+        }
+
         if let Some(ref ppr) = self.ppr {
             ppr.to_xml(writer)?;
         }
@@ -183,6 +198,8 @@ pub struct CT_AbstractNum {
     pub levels: Vec<CT_Lvl>,
     /// Optional multi-level type hint
     pub multi_level_type: Option<String>,
+    /// Unknown identity children preserved for round-trip (nsid, tmpl, name, styleLink).
+    pub extra_xml: Option<Vec<Vec<u8>>>,
 }
 
 #[allow(non_snake_case)]
@@ -192,6 +209,7 @@ impl CT_AbstractNum {
             abstract_num_id: id,
             levels: Vec::new(),
             multi_level_type: None,
+            extra_xml: None,
         }
     }
 
@@ -213,13 +231,19 @@ impl CT_AbstractNum {
                         }
                         abs.levels.push(CT_Lvl::from_xml(reader, ilvl)?);
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        abs.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_element(reader, e)?);
                     }
                 }
                 Ok(Event::Empty(ref e)) => {
                     let name = e.name();
                     if matches_local_name(name.as_ref(), b"multiLevelType") {
                         abs.multi_level_type = get_val_attr(e)?;
+                    } else {
+                        abs.extra_xml
+                            .get_or_insert_with(Vec::new)
+                            .push(crate::raw_xml::capture_empty_element(e)?);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"abstractNum") => {
@@ -245,6 +269,12 @@ impl CT_AbstractNum {
             let mut e = BytesStart::new("w:multiLevelType");
             e.push_attribute(("w:val", mlt.as_str()));
             writer.write_event(Event::Empty(e))?;
+        }
+
+        if let Some(ref extras) = self.extra_xml {
+            for raw in extras {
+                writer.get_mut().write_all(raw)?;
+            }
         }
 
         for lvl in &self.levels {
@@ -673,5 +703,16 @@ mod tests {
         assert_eq!(abs.levels[0].num_fmt, Some(ST_NumberFormat::Decimal));
 
         assert!(numbering.get_abstract_num_for(99).is_none());
+    }
+
+    #[test]
+    fn numbering_preserves_unknown_children() {
+        // nsid/tmpl (abstractNum identity) and suff (level) are real elements we don't model.
+        let xml = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:nsid w:val="1A2B3C4D"/><w:multiLevelType w:val="hybridMultilevel"/><w:tmpl w:val="FFFF"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:suff w:val="space"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>"#;
+        let parsed = CT_Numbering::from_xml(xml).unwrap();
+        let out = String::from_utf8(parsed.to_xml().unwrap()).unwrap();
+        assert!(out.contains(r#"w:val="1A2B3C4D""#), "nsid lost: {out}");
+        assert!(out.contains("w:tmpl"), "tmpl lost: {out}");
+        assert!(out.contains("w:suff"), "suff lost: {out}");
     }
 }
