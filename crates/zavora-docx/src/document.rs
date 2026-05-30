@@ -38,6 +38,8 @@ pub struct Document {
     protection_type: Option<String>,
     /// Whether to force Word to recalculate fields (e.g. TOC PAGEREF) on open.
     update_fields: bool,
+    /// Emit evenAndOddHeaders so verso/recto headers render distinctly.
+    even_odd_headers: bool,
     /// Part name for the main document
     doc_part_name: String,
     /// Cached count of image media parts (avoids rescanning parts on each embed).
@@ -67,6 +69,7 @@ impl Document {
             comments_xml: None,
             protection_type: None,
             update_fields: false,
+            even_odd_headers: false,
             doc_part_name: "/word/document.xml".to_string(),
             image_counter: 0,
         }
@@ -163,6 +166,7 @@ impl Document {
             comments_xml: None,
             protection_type: None,
             update_fields: false,
+            even_odd_headers: false,
             doc_part_name,
             image_counter,
         })
@@ -241,10 +245,15 @@ impl Document {
             );
         }
 
-        // Serialize settings.xml if we need protection and/or field recalculation.
-        if self.protection_type.is_some() || self.update_fields {
+        // Serialize settings.xml if we need protection, field recalc, or even/odd headers.
+        if self.protection_type.is_some() || self.update_fields || self.even_odd_headers {
             let update = if self.update_fields {
                 r#"<w:updateFields w:val="true"/>"#
+            } else {
+                ""
+            };
+            let even_odd = if self.even_odd_headers {
+                r#"<w:evenAndOddHeaders/>"#
             } else {
                 ""
             };
@@ -254,7 +263,7 @@ impl Document {
                 .map(|p| format!(r#"<w:documentProtection w:edit="{p}" w:enforcement="1"/>"#))
                 .unwrap_or_default();
             let xml = format!(
-                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{update}{prot}</w:settings>"#,
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{update}{even_odd}{prot}</w:settings>"#,
             );
             self.package.set_part("/word/settings.xml", xml.into_bytes());
             self.package.content_types.add_override(
@@ -611,6 +620,60 @@ impl Document {
     /// the section properties.
     pub fn set_header(&mut self, text: &str) {
         self.set_header_footer_part(text, true, HdrFtrType::Default);
+    }
+
+    /// Set a professionally-styled running header: centered, italic, small-caps,
+    /// with a touch of letter spacing — the look used in published fiction.
+    /// When `verso` differs from `recto`, configures distinct even/odd-page
+    /// headers (author on the left page, title on the right).
+    pub fn set_running_header(&mut self, verso: &str, recto: &str) {
+        use rdocx_opc::relationship::rel_types;
+        use rdocx_oxml::text::CT_R;
+
+        let build = |text: &str| -> Vec<u8> {
+            let mut hf = CT_HdrFtr::new();
+            let mut p = CT_P::new();
+            p.properties = Some(CT_PPr {
+                jc: Some(rdocx_oxml::shared::ST_Jc::Center),
+                ..Default::default()
+            });
+            let mut r = CT_R::new(text);
+            r.properties = Some(CT_RPr {
+                italic: Some(true),
+                italic_cs: Some(true),
+                small_caps: Some(true),
+                spacing: Some(rdocx_oxml::units::Twips(10)),
+                ..Default::default()
+            });
+            p.runs.push(r);
+            hf.paragraphs.push(p);
+            hf.to_xml_header().expect("header serialization failed")
+        };
+
+        let mut add = |text: &str, ty: HdrFtrType, suffix: &str| {
+            let part = format!("/word/header{suffix}1.xml");
+            self.package.set_part(&part, build(text));
+            self.package.content_types.add_override(
+                &part,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+            );
+            let rel_id = self
+                .package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add(rel_types::HEADER, &format!("header{suffix}1.xml"));
+            let sect = self.section_properties_mut();
+            sect.header_refs.retain(|h| h.hdr_ftr_type != ty);
+            sect.header_refs.push(HdrFtrRef { hdr_ftr_type: ty, rel_id });
+        };
+
+        if verso == recto {
+            add(recto, HdrFtrType::Default, "");
+        } else {
+            // Odd (recto) = default page header; even (verso) = Even header.
+            add(recto, HdrFtrType::Default, "");
+            add(verso, HdrFtrType::Even, "Even");
+            self.even_odd_headers = true;
+        }
     }
 
     /// Set the default footer text.
