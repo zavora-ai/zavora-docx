@@ -80,6 +80,132 @@ impl StyleBuilder {
         self
     }
 
+    // ── Typed fluent setters (no need to touch internal oxml types) ──────────
+
+    fn ppr(&mut self) -> &mut CT_PPr {
+        self.style.ppr.get_or_insert_with(CT_PPr::default)
+    }
+    fn rpr(&mut self) -> &mut CT_RPr {
+        self.style.rpr.get_or_insert_with(CT_RPr::default)
+    }
+
+    /// Text alignment: "left", "right", "center", "both" (justified).
+    pub fn align(mut self, jc: &str) -> Self {
+        use rdocx_oxml::shared::ST_Jc;
+        self.ppr().jc = Some(match jc {
+            "center" => ST_Jc::Center,
+            "right" => ST_Jc::Right,
+            "both" | "justify" | "justified" => ST_Jc::Both,
+            _ => ST_Jc::Left,
+        });
+        self
+    }
+
+    /// First-line indent.
+    pub fn first_line_indent(mut self, len: crate::Length) -> Self {
+        self.ppr().ind_first_line = Some(len.as_twips());
+        self
+    }
+
+    /// Left indent.
+    pub fn left_indent(mut self, len: crate::Length) -> Self {
+        self.ppr().ind_left = Some(len.as_twips());
+        self
+    }
+
+    /// Line spacing as a multiple of single spacing (1.0 = single, 1.5, 2.0…).
+    pub fn line_spacing(mut self, multiple: f64) -> Self {
+        let ppr = self.ppr();
+        ppr.line_spacing = Some(rdocx_oxml::units::Twips((multiple * 240.0).round() as i32));
+        ppr.line_rule = Some("auto".to_string());
+        self
+    }
+
+    /// Space before/after the paragraph.
+    pub fn spacing(mut self, before: crate::Length, after: crate::Length) -> Self {
+        let ppr = self.ppr();
+        ppr.space_before = Some(before.as_twips());
+        ppr.space_after = Some(after.as_twips());
+        self
+    }
+
+    /// Keep this paragraph with the next (no page break between).
+    pub fn keep_with_next(mut self, val: bool) -> Self {
+        self.ppr().keep_next = Some(val);
+        self
+    }
+
+    /// Widow/orphan control (avoid a lone line at top/bottom of a page).
+    pub fn widow_control(mut self, val: bool) -> Self {
+        self.ppr().widow_control = Some(val);
+        self
+    }
+
+    /// Outline level (0 = Heading1 … 8). Set so the TOC and nav pane detect it.
+    pub fn outline_level(mut self, lvl: u32) -> Self {
+        self.ppr().outline_lvl = Some(lvl);
+        self
+    }
+
+    /// Page-break before this paragraph.
+    pub fn page_break_before(mut self, val: bool) -> Self {
+        self.ppr().page_break_before = Some(val);
+        self
+    }
+
+    /// Font family (sets ascii + hAnsi). Clears any theme-font reference.
+    pub fn font(mut self, family: &str) -> Self {
+        let rpr = self.rpr();
+        rpr.font_ascii = Some(family.to_string());
+        rpr.font_hansi = Some(family.to_string());
+        rpr.font_ascii_theme = None;
+        rpr.font_hansi_theme = None;
+        self
+    }
+
+    /// Font size in points.
+    pub fn size(mut self, pt: f64) -> Self {
+        let hp = rdocx_oxml::units::HalfPoint((pt * 2.0).round() as u32);
+        let rpr = self.rpr();
+        rpr.sz = Some(hp);
+        rpr.sz_cs = Some(hp);
+        self
+    }
+
+    /// Text color as a hex string ("000000").
+    pub fn color(mut self, hex: &str) -> Self {
+        self.rpr().color = Some(hex.to_string());
+        self
+    }
+
+    /// Bold.
+    pub fn bold(mut self, val: bool) -> Self {
+        let rpr = self.rpr();
+        rpr.bold = Some(val);
+        rpr.bold_cs = Some(val);
+        self
+    }
+
+    /// Italic.
+    pub fn italic(mut self, val: bool) -> Self {
+        let rpr = self.rpr();
+        rpr.italic = Some(val);
+        rpr.italic_cs = Some(val);
+        self
+    }
+
+    /// Small caps.
+    pub fn small_caps(mut self, val: bool) -> Self {
+        self.rpr().small_caps = Some(val);
+        self
+    }
+
+    /// Letter spacing (character spacing) in points.
+    pub fn letter_spacing(mut self, pt: f64) -> Self {
+        self.rpr().spacing = Some(rdocx_oxml::units::Twips((pt * 20.0).round() as i32));
+        self
+    }
+
     /// Set paragraph properties for this style.
     pub fn paragraph_properties(mut self, ppr: CT_PPr) -> Self {
         self.style.ppr = Some(ppr);

@@ -1348,9 +1348,21 @@ impl Document {
 
     // ---- Style manipulation ----
 
-    /// Add a custom style to the document.
+    /// Add a custom style to the document. If a style with the same id already
+    /// exists (e.g. a shipped default like `Normal` or `Heading1`), it is
+    /// replaced — letting each document override the look of any named style.
     pub fn add_style(&mut self, builder: StyleBuilder) {
-        self.styles.styles.push(builder.build());
+        let style = builder.build();
+        if let Some(existing) = self
+            .styles
+            .styles
+            .iter_mut()
+            .find(|s| s.style_id == style.style_id)
+        {
+            *existing = style;
+        } else {
+            self.styles.styles.push(style);
+        }
     }
 
     /// Resolve the effective paragraph properties for a given style ID,
@@ -1853,7 +1865,6 @@ impl Document {
     pub fn insert_toc(&mut self, index: usize, max_level: u32) -> usize {
         use rdocx_oxml::borders::{CT_TabStop, CT_Tabs};
         use rdocx_oxml::shared::{ST_TabJc, ST_TabLeader};
-        use rdocx_oxml::text::HyperlinkSpan;
         use rdocx_oxml::units::Twips;
 
         let max_level = max_level.clamp(1, 9);
@@ -3145,6 +3156,25 @@ mod tests {
         assert_eq!(rpr.sz, Some(HalfPoint(32)));
         // Headings use the major theme font (not a literal family name).
         assert_eq!(rpr.font_ascii_theme, Some("majorHAnsi".to_string()));
+    }
+
+    #[test]
+    fn add_style_overrides_shipped_style_by_id() {
+        use crate::StyleBuilder;
+        let mut doc = Document::new();
+        let before = doc.styles().len();
+        // Override the shipped Normal with a justified 12pt body style.
+        doc.add_style(
+            StyleBuilder::paragraph("Normal", "Normal")
+                .font("Georgia")
+                .size(12.0)
+                .align("both"),
+        );
+        // Count unchanged (replaced, not appended).
+        assert_eq!(doc.styles().len(), before);
+        let rpr = doc.resolve_run_properties(Some("Normal"), None);
+        assert_eq!(rpr.font_ascii, Some("Georgia".to_string()));
+        assert_eq!(rpr.sz, Some(HalfPoint(24)));
     }
 
     #[test]
