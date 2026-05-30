@@ -65,6 +65,31 @@ impl<'a> Table<'a> {
         self
     }
 
+    /// Set non-uniform column widths. Replaces the grid and sets each cell's
+    /// width to match, then forces fixed layout so Word honors the widths.
+    /// `widths` length should equal the column count.
+    pub fn column_widths(mut self, widths: &[Length]) -> Self {
+        use rdocx_oxml::table::{CT_TblGrid, CT_TblGridCol, CT_TblWidth};
+        use rdocx_oxml::units::Twips;
+        let cols: Vec<Twips> = widths.iter().map(|w| Twips(w.as_twips().0)).collect();
+        let total: i32 = cols.iter().map(|t| t.0).sum();
+        self.inner.grid = Some(CT_TblGrid {
+            columns: cols.iter().map(|w| CT_TblGridCol { width: *w }).collect(),
+        });
+        // Mirror widths onto each row's cells so fixed layout renders correctly.
+        for row in &mut self.inner.rows {
+            for (i, cell) in row.cells.iter_mut().enumerate() {
+                if let Some(w) = cols.get(i) {
+                    cell.properties.get_or_insert_with(Default::default).width =
+                        Some(CT_TblWidth::dxa(w.0));
+                }
+            }
+        }
+        self.ensure_tbl_pr().width = Some(CT_TblWidth::dxa(total));
+        self.ensure_tbl_pr().layout = Some("fixed".to_string());
+        self
+    }
+
     /// Set table alignment.
     pub fn alignment(mut self, jc: crate::paragraph::Alignment) -> Self {
         use crate::paragraph::Alignment;

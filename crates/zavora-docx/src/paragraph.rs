@@ -152,6 +152,16 @@ impl<'a> Paragraph<'a> {
         }
     }
 
+    /// Add a tab character (a real `<w:tab/>`) that advances to the next tab
+    /// stop. Use with `add_tab_stop` to right-align trailing text (e.g. dates).
+    pub fn add_tab(&mut self) -> &mut Self {
+        use rdocx_oxml::text::RunContent;
+        let mut r = CT_R::new("");
+        r.content = vec![RunContent::Tab];
+        self.inner.runs.push(r);
+        self
+    }
+
     /// Add a hyperlink run. The `rel_id` should be obtained from `Document::add_hyperlink_rel()`.
     /// For internal links, pass `None` for rel_id and `Some(bookmark)` for anchor.
     pub fn add_hyperlink_run(&mut self, text: &str, rel_id: Option<&str>, anchor: Option<&str>) -> Run<'_> {

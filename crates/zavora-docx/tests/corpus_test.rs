@@ -81,3 +81,27 @@ fn corpus_picture_with_props_round_trips() {
     let reopened = Document::from_bytes(&bytes).expect("reopen");
     assert_eq!(reopened.content_count(), 1);
 }
+
+#[test]
+fn layout_primitives_column_widths_and_tab() {
+    use zavora_docx::{BorderStyle, TabAlignment};
+    let mut doc = Document::new();
+    // Non-uniform columns + borders on a 2x2 table.
+    let mut t = doc
+        .add_table(2, 2)
+        .borders(BorderStyle::Single, 4, "000000")
+        .column_widths(&[Length::inches(4.0), Length::inches(2.0)]);
+    if let Some(mut c) = t.cell(0, 0) { c.set_text("wide"); }
+    if let Some(mut c) = t.cell(0, 1) { c.set_text("narrow"); }
+    // A tab-aligned line: left text, right tab stop, trailing run.
+    {
+        let mut p = doc.add_paragraph("").add_tab_stop(TabAlignment::Right, Length::inches(6.5));
+        p.add_run("Left");
+        p.add_tab();
+        p.add_run("Right");
+    }
+    let bytes = doc.to_bytes().expect("serialize");
+    // Re-parse proves it's well-formed end to end.
+    let reopened = Document::from_bytes(&bytes).expect("reopen");
+    assert!(reopened.content_count() >= 2);
+}
