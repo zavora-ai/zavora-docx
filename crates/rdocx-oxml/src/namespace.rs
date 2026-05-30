@@ -11,6 +11,9 @@ pub const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/re
 /// Markup Compatibility namespace
 pub const MC_NS: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
+/// Office Math (OMML) namespace
+pub const M_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+
 /// Check if a tag name matches an expected local name, accounting for namespace prefixes.
 pub fn matches_local_name(tag: &[u8], local_name: &[u8]) -> bool {
     if tag == local_name {

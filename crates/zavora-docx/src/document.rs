@@ -350,6 +350,20 @@ impl Document {
         }
     }
 
+    /// Append a block-level mathematical equation built from a [`MathNode`] tree.
+    pub fn add_equation(&mut self, math: &rdocx_oxml::math::MathNode) {
+        if let Ok(bytes) = math.to_omath_para_bytes() {
+            self.document.body.content.push(BodyContent::RawXml(bytes));
+        }
+    }
+
+    /// Append a block-level equation parsed from a LaTeX-subset string
+    /// (e.g. `\frac{a}{b}^2`, `\sum_{i=1}^{n} i`, `\sqrt{x}`).
+    pub fn add_equation_latex(&mut self, latex: &str) {
+        let math = rdocx_oxml::math::from_latex(latex);
+        self.add_equation(&math);
+    }
+
     /// Get the number of paragraphs.
     pub fn paragraph_count(&self) -> usize {
         self.document.body.paragraphs().count()
@@ -3843,6 +3857,17 @@ mod tests {
         let mut doc = Document::new();
         doc.add_paragraph("Just text.");
         assert!(doc.images().is_empty());
+    }
+
+    #[test]
+    fn equation_latex_round_trips() {
+        let mut doc = Document::new();
+        doc.add_paragraph("Formula:");
+        doc.add_equation_latex(r"\frac{a}{b}^2");
+        let bytes = doc.to_bytes().expect("serialize");
+        let reopened = Document::from_bytes(&bytes).expect("open");
+        // The oMathPara is preserved as raw body content across the round-trip.
+        assert!(reopened.content_count() >= 2);
     }
 
     #[test]

@@ -18,6 +18,7 @@ pub mod drawing;
 pub mod error;
 pub mod footnotes;
 pub mod header_footer;
+pub mod math;
 pub mod namespace;
 pub mod numbering;
 pub mod placeholder;

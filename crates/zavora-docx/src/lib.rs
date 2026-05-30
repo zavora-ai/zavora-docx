@@ -33,6 +33,7 @@ pub use document::{AccessibilityIssue, Document, ImageInfo, IssueSeverity, LinkI
 pub use error::{Error, Result};
 pub use length::Length;
 pub use rdocx_oxml::drawing::PicProps;
+pub use rdocx_oxml::math::MathNode;
 pub use rdocx_oxml::sdt::SdtKind;
 pub use paragraph::{
     Alignment, BorderStyle, Paragraph, ParagraphRef, SectionBreak, TabAlignment, TabLeader,
