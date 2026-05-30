@@ -584,6 +584,41 @@ impl Document {
         }
     }
 
+    /// Add a full-page (full-bleed) background image anchored to the page that
+    /// the paragraph at `index` falls on. Unlike [`add_background_image`] (which
+    /// only covers page 1), this lets each page/spread have its own background —
+    /// essential for children's books and illustrated interiors. Place a
+    /// `page_break_before` paragraph at `index` so the image anchors to that page.
+    pub fn add_page_background_at(
+        &mut self,
+        index: usize,
+        image_data: &[u8],
+        image_filename: &str,
+    ) -> usize {
+        let rel_id = self.embed_image(image_data, image_filename);
+        let sect = self
+            .document
+            .body
+            .sect_pr
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(CT_SectPr::default_letter);
+        let pw = sect.page_width.unwrap_or(rdocx_oxml::units::Twips(12240)).to_emu().0;
+        let ph = sect.page_height.unwrap_or(rdocx_oxml::units::Twips(15840)).to_emu().0;
+
+        let anchor = CT_Anchor::background(&rel_id, pw, ph);
+        let drawing = CT_Drawing::anchor(anchor);
+        let mut p = CT_P::new();
+        p.runs.push(CT_R {
+            properties: None,
+            content: vec![RunContent::Drawing(drawing)],
+            extra_xml: Vec::new(),
+        });
+        let at = index.min(self.document.body.content.len());
+        self.document.body.insert_paragraph(at, p);
+        at
+    }
+
     /// Return the next unique image number and bump the counter.
     fn next_image_number(&mut self) -> usize {
         self.image_counter += 1;
@@ -3257,6 +3292,25 @@ mod tests {
         let rpr = doc.resolve_run_properties(Some("Normal"), None);
         assert_eq!(rpr.font_ascii, Some("Georgia".to_string()));
         assert_eq!(rpr.sz, Some(HalfPoint(24)));
+    }
+
+    #[test]
+    fn add_page_background_at_index() {
+        let mut doc = Document::new();
+        doc.add_paragraph("Page 1");
+        doc.add_paragraph("Page 2 marker");
+        let png = [0x89, b'P', b'N', b'G', 0, 0, 0, 0];
+        let at = doc.add_page_background_at(1, &png, "bg.png");
+        assert_eq!(at, 1);
+        // Inserted one content element at index 1.
+        assert_eq!(doc.content_count(), 3);
+        // Round-trips with a behindDoc anchor.
+        let bytes = doc.to_bytes().expect("serialize");
+        let xml = {
+            let reopened = Document::from_bytes(&bytes).expect("reopen");
+            reopened.content_count()
+        };
+        assert_eq!(xml, 3);
     }
 
     #[test]
