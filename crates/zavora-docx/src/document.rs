@@ -235,6 +235,28 @@ impl Document {
         let styles_xml = self.styles.to_xml()?;
         self.package.set_part("/word/styles.xml", styles_xml);
 
+        // Emit a fontTable.xml part declaring common fonts (real Word docs always
+        // ship one; some consumers expect it). Idempotent across saves.
+        if self.package.get_part("/word/fontTable.xml").is_none() {
+            let ft = concat!(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+                r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                r#"<w:font w:name="Calibri"><w:family w:val="swiss"/><w:pitch w:val="variable"/></w:font>"#,
+                r#"<w:font w:name="Times New Roman"><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>"#,
+                r#"<w:font w:name="Cambria"><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>"#,
+                r#"<w:font w:name="Courier New"><w:family w:val="mod4"/><w:pitch w:val="fixed"/></w:font>"#,
+                r#"</w:fonts>"#,
+            );
+            self.package.set_part("/word/fontTable.xml", ft.as_bytes().to_vec());
+            self.package.content_types.add_override(
+                "/word/fontTable.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
+            );
+            self.package
+                .get_or_create_part_rels(&self.doc_part_name)
+                .add_if_absent(rel_types::FONT_TABLE, "fontTable.xml");
+        }
+
         // Serialize numbering.xml if we have numbering definitions
         if let Some(ref numbering) = self.numbering {
             let numbering_xml = numbering.to_xml()?;

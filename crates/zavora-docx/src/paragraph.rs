@@ -125,6 +125,25 @@ impl<'a> Paragraph<'a> {
         self.inner.text()
     }
 
+    /// Add a general Word field (complex field) with the given instruction and
+    /// optional cached result text — e.g. `DATE \@ "yyyy-MM-dd"`, `REF bookmark`,
+    /// `SEQ Figure \* ARABIC`, `STYLEREF "Heading 1"`. Word recomputes it on open
+    /// when update fields is enabled.
+    pub fn add_field(&mut self, instruction: &str, cached: Option<&str>) {
+        let result = cached.unwrap_or("");
+        let xml = format!(
+            concat!(
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="begin"/></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:instrText xml:space="preserve"> {} </w:instrText></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="separate"/></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t xml:space="preserve">{}</w:t></w:r>"#,
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldChar w:fldCharType="end"/></w:r>"#,
+            ),
+            instruction, result
+        );
+        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+    }
+
     /// Add a run with the given text and return a mutable reference for chaining.
     pub fn add_run(&mut self, text: &str) -> Run<'_> {
         self.inner.runs.push(CT_R::new(text));
