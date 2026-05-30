@@ -502,6 +502,34 @@ impl Document {
         }
     }
 
+    /// Add an inline picture with extra features (rotation, crop, border,
+    /// shadow, flips, alt-text title) via [`PicProps`].
+    pub fn add_picture_with(
+        &mut self,
+        image_data: &[u8],
+        image_filename: &str,
+        width: Length,
+        height: Length,
+        props: rdocx_oxml::drawing::PicProps,
+    ) -> Paragraph<'_> {
+        let rel_id = self.embed_image(image_data, image_filename);
+        let mut inline = CT_Inline::new(&rel_id, width.to_emu(), height.to_emu());
+        inline.props = props;
+        let drawing = CT_Drawing::inline(inline);
+        let run = CT_R {
+            properties: None,
+            content: vec![RunContent::Drawing(drawing)],
+            extra_xml: Vec::new(),
+        };
+        let mut p = CT_P::new();
+        p.runs.push(run);
+        self.document.body.content.push(BodyContent::Paragraph(p));
+        match self.document.body.content.last_mut().unwrap() {
+            BodyContent::Paragraph(p) => Paragraph { inner: p },
+            _ => unreachable!(),
+        }
+    }
+
     /// Add a full-page background image behind text.
     ///
     /// The image is placed at position (0,0) relative to the page with

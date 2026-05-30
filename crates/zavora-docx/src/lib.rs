@@ -32,6 +32,7 @@ pub mod table;
 pub use document::{AccessibilityIssue, Document, ImageInfo, IssueSeverity, LinkInfo, OutlineNode};
 pub use error::{Error, Result};
 pub use length::Length;
+pub use rdocx_oxml::drawing::PicProps;
 pub use paragraph::{
     Alignment, BorderStyle, Paragraph, ParagraphRef, SectionBreak, TabAlignment, TabLeader,
 };

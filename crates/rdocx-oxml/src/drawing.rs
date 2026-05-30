@@ -106,6 +106,28 @@ pub enum WrapType {
     None,
 }
 
+/// Optional picture features applied when constructing a drawing (rotation,
+/// cropping, border, shadow, flips, alt-text title). Defaults are no-op so a
+/// bare picture serializes exactly as before.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PicProps {
+    /// Clockwise rotation in 60,000ths of a degree (a:xfrm@rot).
+    pub rotation: Option<i32>,
+    /// Horizontal flip.
+    pub flip_h: bool,
+    /// Vertical flip.
+    pub flip_v: bool,
+    /// Crop insets as fractions [left, top, right, bottom] in 1000ths of a percent
+    /// (a:srcRect). e.g. 10000 = crop 10%.
+    pub crop: Option<[i32; 4]>,
+    /// Solid border: (color hex, width in EMUs).
+    pub border: Option<(String, i64)>,
+    /// Outer shadow with the given hex color.
+    pub shadow: Option<String>,
+    /// Accessibility title (docPr@title), distinct from description.
+    pub title: Option<String>,
+}
+
 /// `CT_Anchor` — An anchored (floating) drawing element.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CT_Anchor {
@@ -133,6 +155,8 @@ pub struct CT_Anchor {
     pub description: Option<String>,
     /// Optional name.
     pub name: Option<String>,
+    /// Optional picture features (rotation, crop, border, shadow, title).
+    pub props: PicProps,
     /// Raw XML bytes for the entire wp:anchor element (used for round-trip preservation).
     /// When present, to_xml uses this instead of structured serialization.
     pub raw_xml: Option<Vec<u8>>,
@@ -154,6 +178,7 @@ impl CT_Anchor {
             relative_height: 0,
             description: Some("Background".to_string()),
             name: Some("Background".to_string()),
+            props: PicProps::default(),
             raw_xml: None,
         }
     }
@@ -334,6 +359,7 @@ impl CT_Anchor {
             relative_height,
             description,
             name,
+            props: PicProps::default(),
             raw_xml: None, // Will be set by CT_Drawing::from_xml
         })
     }
@@ -399,6 +425,9 @@ impl CT_Anchor {
         if let Some(ref desc) = self.description {
             doc_pr.push_attribute(("descr", desc.as_str()));
         }
+        if let Some(ref title) = self.props.title {
+            doc_pr.push_attribute(("title", title.as_str()));
+        }
         writer.write_event(Event::Empty(doc_pr))?;
 
         // a:graphic (same pic:pic structure as inline)
@@ -408,6 +437,7 @@ impl CT_Anchor {
             self.extent_cx,
             self.extent_cy,
             self.name.as_deref(),
+            &self.props,
         )?;
 
         writer.write_event(Event::End(BytesEnd::new("wp:anchor")))?;
@@ -428,6 +458,8 @@ pub struct CT_Inline {
     pub description: Option<String>,
     /// Optional name
     pub name: Option<String>,
+    /// Optional picture features (rotation, crop, border, shadow, title).
+    pub props: PicProps,
     /// Raw XML bytes for the entire wp:inline element (used for round-trip preservation).
     /// When present, to_xml uses this instead of structured serialization.
     pub raw_xml: Option<Vec<u8>>,
@@ -441,6 +473,7 @@ impl CT_Inline {
             embed_id: embed_id.to_string(),
             description: None,
             name: None,
+            props: PicProps::default(),
             raw_xml: None,
         }
     }
@@ -534,6 +567,7 @@ impl CT_Inline {
             embed_id,
             description,
             name,
+            props: PicProps::default(),
             raw_xml: None, // Will be set by CT_Drawing::from_xml
         })
     }
@@ -567,6 +601,9 @@ impl CT_Inline {
         if let Some(ref desc) = self.description {
             doc_pr.push_attribute(("descr", desc.as_str()));
         }
+        if let Some(ref title) = self.props.title {
+            doc_pr.push_attribute(("title", title.as_str()));
+        }
         writer.write_event(Event::Empty(doc_pr))?;
 
         // a:graphic
@@ -576,6 +613,7 @@ impl CT_Inline {
             self.extent_cx,
             self.extent_cy,
             self.name.as_deref(),
+            &self.props,
         )?;
 
         writer.write_event(Event::End(BytesEnd::new("wp:inline")))?;
@@ -591,6 +629,7 @@ fn write_graphic_element<W: std::io::Write>(
     cx: Emu,
     cy: Emu,
     name: Option<&str>,
+    props: &PicProps,
 ) -> Result<()> {
     let mut buf = itoa::Buffer::new();
     let mut graphic = BytesStart::new("a:graphic");
@@ -619,6 +658,15 @@ fn write_graphic_element<W: std::io::Write>(
     let mut blip = BytesStart::new("a:blip");
     blip.push_attribute(("r:embed", embed_id));
     writer.write_event(Event::Empty(blip))?;
+    // Crop via a:srcRect
+    if let Some([l, t, r, b]) = props.crop {
+        let mut sr = BytesStart::new("a:srcRect");
+        sr.push_attribute(("l", buf.format(l)));
+        sr.push_attribute(("t", buf.format(t)));
+        sr.push_attribute(("r", buf.format(r)));
+        sr.push_attribute(("b", buf.format(b)));
+        writer.write_event(Event::Empty(sr))?;
+    }
     writer.write_event(Event::Start(BytesStart::new("a:stretch")))?;
     writer.write_event(Event::Empty(BytesStart::new("a:fillRect")))?;
     writer.write_event(Event::End(BytesEnd::new("a:stretch")))?;
@@ -626,7 +674,17 @@ fn write_graphic_element<W: std::io::Write>(
 
     // pic:spPr
     writer.write_event(Event::Start(BytesStart::new("pic:spPr")))?;
-    writer.write_event(Event::Start(BytesStart::new("a:xfrm")))?;
+    let mut xfrm = BytesStart::new("a:xfrm");
+    if let Some(rot) = props.rotation {
+        xfrm.push_attribute(("rot", buf.format(rot)));
+    }
+    if props.flip_h {
+        xfrm.push_attribute(("flipH", "1"));
+    }
+    if props.flip_v {
+        xfrm.push_attribute(("flipV", "1"));
+    }
+    writer.write_event(Event::Start(xfrm))?;
     let mut off = BytesStart::new("a:off");
     off.push_attribute(("x", "0"));
     off.push_attribute(("y", "0"));
@@ -641,6 +699,37 @@ fn write_graphic_element<W: std::io::Write>(
     writer.write_event(Event::Start(prst))?;
     writer.write_event(Event::Empty(BytesStart::new("a:avLst")))?;
     writer.write_event(Event::End(BytesEnd::new("a:prstGeom")))?;
+    // Border via a:ln with solid fill
+    if let Some((ref color, width)) = props.border {
+        let mut ln = BytesStart::new("a:ln");
+        ln.push_attribute(("w", buf.format(width)));
+        writer.write_event(Event::Start(ln))?;
+        writer.write_event(Event::Start(BytesStart::new("a:solidFill")))?;
+        let mut clr = BytesStart::new("a:srgbClr");
+        clr.push_attribute(("val", color.as_str()));
+        writer.write_event(Event::Empty(clr))?;
+        writer.write_event(Event::End(BytesEnd::new("a:solidFill")))?;
+        writer.write_event(Event::End(BytesEnd::new("a:ln")))?;
+    }
+    // Outer shadow via a:effectLst
+    if let Some(ref color) = props.shadow {
+        writer.write_event(Event::Start(BytesStart::new("a:effectLst")))?;
+        let mut sh = BytesStart::new("a:outerShdw");
+        sh.push_attribute(("blurRad", "40000"));
+        sh.push_attribute(("dist", "20000"));
+        sh.push_attribute(("dir", "5400000"));
+        sh.push_attribute(("rotWithShape", "0"));
+        writer.write_event(Event::Start(sh))?;
+        let mut clr = BytesStart::new("a:srgbClr");
+        clr.push_attribute(("val", color.as_str()));
+        writer.write_event(Event::Start(clr))?;
+        let mut alpha = BytesStart::new("a:alpha");
+        alpha.push_attribute(("val", "40000"));
+        writer.write_event(Event::Empty(alpha))?;
+        writer.write_event(Event::End(BytesEnd::new("a:srgbClr")))?;
+        writer.write_event(Event::End(BytesEnd::new("a:outerShdw")))?;
+        writer.write_event(Event::End(BytesEnd::new("a:effectLst")))?;
+    }
     writer.write_event(Event::End(BytesEnd::new("pic:spPr")))?;
 
     writer.write_event(Event::End(BytesEnd::new("pic:pic")))?;
@@ -787,6 +876,7 @@ mod tests {
             embed_id: "rId5".to_string(),
             description: Some("A test image".to_string()),
             name: Some("TestPic".to_string()),
+            props: PicProps::default(),
             raw_xml: None,
         };
 
@@ -802,6 +892,30 @@ mod tests {
         assert_eq!(inl.extent_cx, Emu(914400));
         assert_eq!(inl.extent_cy, Emu(457200));
         assert_eq!(inl.embed_id, "rId5");
+    }
+
+    #[test]
+    fn inline_picture_features_serialize() {
+        let mut inline = CT_Inline::new("rId7", 914400, 914400);
+        inline.props = PicProps {
+            rotation: Some(2_700_000), // 45°
+            flip_h: true,
+            crop: Some([10000, 0, 10000, 0]),
+            border: Some(("FF0000".to_string(), 12700)),
+            shadow: Some("808080".to_string()),
+            title: Some("Logo".to_string()),
+            ..Default::default()
+        };
+        let drawing = CT_Drawing::inline(inline);
+        let mut out = Vec::new();
+        drawing.to_xml(&mut Writer::new(&mut out)).unwrap();
+        let xml = String::from_utf8(out).unwrap();
+        assert!(xml.contains(r#"rot="2700000""#), "rotation: {xml}");
+        assert!(xml.contains(r#"flipH="1""#), "flipH: {xml}");
+        assert!(xml.contains("a:srcRect"), "crop: {xml}");
+        assert!(xml.contains("a:ln"), "border: {xml}");
+        assert!(xml.contains("a:outerShdw"), "shadow: {xml}");
+        assert!(xml.contains(r#"title="Logo""#), "title: {xml}");
     }
 
     #[test]
