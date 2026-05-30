@@ -137,7 +137,8 @@ impl CT_PPr {
                     } else if matches_local_name(name.as_ref(), b"sectPr") {
                         ppr.sect_pr = Some(CT_SectPr::from_xml(reader)?);
                     } else {
-                        reader.read_to_end_into(name, &mut Vec::new())?;
+                        let raw = crate::raw_xml::capture_element(reader, e)?;
+                        ppr.extra_xml.get_or_insert_with(Vec::new).push(raw);
                     }
                 }
                 Ok(Event::Empty(ref e)) => {
@@ -201,6 +202,9 @@ impl CT_PPr {
                         }
                     } else if matches_local_name(name.as_ref(), b"shd") {
                         ppr.shading = Some(CT_Shd::from_xml_attrs(e)?);
+                    } else {
+                        let raw = crate::raw_xml::capture_empty_element(e)?;
+                        ppr.extra_xml.get_or_insert_with(Vec::new).push(raw);
                     }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"pPr") => {
@@ -664,10 +668,14 @@ impl CT_RPr {
                         rpr.shading = Some(CT_Shd::from_xml_attrs(e)?);
                     } else if matches_local_name(name.as_ref(), b"vanish") {
                         rpr.vanish = Some(parse_toggle(e)?);
+                    } else {
+                        let raw = crate::raw_xml::capture_empty_element(e)?;
+                        rpr.extra_xml.get_or_insert_with(Vec::new).push(raw);
                     }
                 }
                 Ok(Event::Start(ref e)) => {
-                    reader.read_to_end_into(e.name(), &mut Vec::new())?;
+                    let raw = crate::raw_xml::capture_element(reader, e)?;
+                    rpr.extra_xml.get_or_insert_with(Vec::new).push(raw);
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"rPr") => {
                     break;
@@ -1039,6 +1047,40 @@ mod tests {
         assert_eq!(ppr.space_before, Some(Twips(240)));
         assert_eq!(ppr.space_after, Some(Twips(120)));
         assert_eq!(ppr.line_spacing, Some(Twips(360)));
+    }
+
+    fn rpr_to_string(rpr: &CT_RPr) -> String {
+        let mut w = Writer::new(Vec::new());
+        rpr.to_xml(&mut w).unwrap();
+        String::from_utf8(w.into_inner()).unwrap()
+    }
+
+    fn ppr_to_string(ppr: &CT_PPr) -> String {
+        let mut w = Writer::new(Vec::new());
+        ppr.to_xml(&mut w).unwrap();
+        String::from_utf8(w.into_inner()).unwrap()
+    }
+
+    #[test]
+    fn rpr_preserves_unknown_elements() {
+        // w:lang and w:em aren't typed fields — must round-trip via extra_xml.
+        let rpr = parse_rpr(r#"<w:b/><w:lang w:val="en-US" w:eastAsia="ja-JP"/><w:em w:val="dot"/>"#);
+        assert_eq!(rpr.bold, Some(true));
+        let out = rpr_to_string(&rpr);
+        assert!(out.contains(r#"w:val="en-US""#), "lang lost: {out}");
+        assert!(out.contains("w:em"), "em lost: {out}");
+    }
+
+    #[test]
+    fn ppr_preserves_unknown_nested_elements() {
+        // w:rPrChange (tracked-change revision) is a nested element we don't model.
+        let ppr = parse_ppr(
+            r#"<w:jc w:val="both"/><w:rPrChange w:id="1" w:author="A"><w:rPr/></w:rPrChange>"#,
+        );
+        assert_eq!(ppr.jc, Some(ST_Jc::Both));
+        let out = ppr_to_string(&ppr);
+        assert!(out.contains("w:rPrChange"), "rPrChange lost: {out}");
+        assert!(out.contains(r#"w:author="A""#), "revision attrs lost: {out}");
     }
 
     #[test]
