@@ -406,6 +406,51 @@ impl Document {
         }
     }
 
+    /// Append a chart (bar/column/line/pie/area). Creates a chart part, wires
+    /// the content-type and relationship, and inserts the referencing drawing.
+    pub fn add_chart(
+        &mut self,
+        chart: &rdocx_oxml::chart::Chart,
+        width: Length,
+        height: Length,
+    ) {
+        use rdocx_opc::relationship::rel_types;
+        let part_xml = match chart.to_part_bytes() {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        // Unique chart part name.
+        let n = self
+            .package
+            .parts
+            .keys()
+            .filter(|k| k.starts_with("/word/charts/chart"))
+            .count()
+            + 1;
+        let part_name = format!("/word/charts/chart{n}.xml");
+        self.package.set_part(&part_name, part_xml);
+        self.package.content_types.add_override(
+            &part_name,
+            "application/vnd.openxmlformats-officedocument.drawingml.chart+xml",
+        );
+        // Relationship from the document part to the chart part.
+        let rel_target = format!("charts/chart{n}.xml");
+        let rel_id = self
+            .package
+            .get_or_create_part_rels(&self.doc_part_name)
+            .add(rel_types::CHART, &rel_target);
+        if let Ok(run) = chart.to_run_bytes(
+            &rel_id,
+            rdocx_oxml::units::Emu(width.to_emu()),
+            rdocx_oxml::units::Emu(height.to_emu()),
+        ) {
+            let mut p = b"<w:p>".to_vec();
+            p.extend_from_slice(&run);
+            p.extend_from_slice(b"</w:p>");
+            self.document.body.content.push(BodyContent::RawXml(p));
+        }
+    }
+
     /// Get the number of paragraphs.
     pub fn paragraph_count(&self) -> usize {
         self.document.body.paragraphs().count()

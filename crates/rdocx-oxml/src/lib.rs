@@ -12,6 +12,7 @@
 
 pub mod app_properties;
 pub mod borders;
+pub mod chart;
 pub mod core_properties;
 pub mod document;
 pub mod drawing;
