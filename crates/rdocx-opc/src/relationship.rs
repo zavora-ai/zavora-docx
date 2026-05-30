@@ -178,6 +178,20 @@ impl Relationships {
             .collect()
     }
 
+    /// Add a relationship only if one with the same type and target does not
+    /// already exist (idempotent — safe to call on every save). Returns the
+    /// existing or newly-created relationship ID.
+    pub fn add_if_absent(&mut self, rel_type: &str, target: &str) -> String {
+        if let Some(r) = self
+            .items
+            .iter()
+            .find(|r| r.rel_type == rel_type && r.target == target)
+        {
+            return r.id.clone();
+        }
+        self.add(rel_type, target)
+    }
+
     /// Add a new relationship and return its generated ID.
     pub fn add(&mut self, rel_type: &str, target: &str) -> String {
         let id = format!("rId{}", self.next_id);

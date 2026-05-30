@@ -234,6 +234,10 @@ impl Document {
                 "/docProps/core.xml",
                 "application/vnd.openxmlformats-package.core-properties+xml",
             );
+            self.package.package_rels.add_if_absent(
+                "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+                "docProps/core.xml",
+            );
         }
 
         // Serialize docProps/app.xml extended properties if present.
@@ -245,7 +249,7 @@ impl Document {
                     "/docProps/app.xml",
                     "application/vnd.openxmlformats-officedocument.extended-properties+xml",
                 );
-                self.package.package_rels.add(
+                self.package.package_rels.add_if_absent(
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
                     "docProps/app.xml",
                 );
@@ -302,7 +306,7 @@ impl Document {
             );
             self.package
                 .get_or_create_part_rels(&self.doc_part_name)
-                .add(
+                .add_if_absent(
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
                     "settings.xml",
                 );
