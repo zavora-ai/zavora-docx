@@ -374,6 +374,38 @@ impl Document {
         self.add_equation(&math);
     }
 
+    /// Append a rectangular text box containing `lines`, sized in inches.
+    pub fn add_text_box(&mut self, width: Length, height: Length, lines: Vec<String>) {
+        let shape = rdocx_oxml::shapes::Shape::text_box(
+            rdocx_oxml::units::Emu(width.to_emu()),
+            rdocx_oxml::units::Emu(height.to_emu()),
+            lines,
+        );
+        self.push_shape(shape);
+    }
+
+    /// Append a preset shape (e.g. "rect", "ellipse", "roundRect", "rightArrow"),
+    /// sized in inches, with an optional solid fill color (hex).
+    pub fn add_shape(&mut self, width: Length, height: Length, geom: &str, fill: Option<&str>) {
+        let mut shape = rdocx_oxml::shapes::Shape::preset(
+            rdocx_oxml::units::Emu(width.to_emu()),
+            rdocx_oxml::units::Emu(height.to_emu()),
+            geom,
+        );
+        shape.fill = fill.map(|s| s.to_string());
+        self.push_shape(shape);
+    }
+
+    /// Wrap a shape's drawing run in a paragraph and push it into the body.
+    fn push_shape(&mut self, shape: rdocx_oxml::shapes::Shape) {
+        if let Ok(run) = shape.to_run_bytes() {
+            let mut p = b"<w:p>".to_vec();
+            p.extend_from_slice(&run);
+            p.extend_from_slice(b"</w:p>");
+            self.document.body.content.push(BodyContent::RawXml(p));
+        }
+    }
+
     /// Get the number of paragraphs.
     pub fn paragraph_count(&self) -> usize {
         self.document.body.paragraphs().count()

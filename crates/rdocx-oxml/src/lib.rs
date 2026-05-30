@@ -26,6 +26,7 @@ pub mod properties;
 pub mod raw_xml;
 pub mod sdt;
 pub mod settings;
+pub mod shapes;
 pub mod shared;
 pub mod styles;
 pub mod table;

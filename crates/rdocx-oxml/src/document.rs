@@ -684,7 +684,15 @@ impl CT_Document {
         let mut buf = Vec::new();
 
         // Known namespace prefixes that we always emit ourselves
-        let known_ns: &[&[u8]] = &[b"xmlns:w", b"xmlns:r", b"xmlns:mc", b"xmlns"];
+        let known_ns: &[&[u8]] = &[
+            b"xmlns:w",
+            b"xmlns:r",
+            b"xmlns:mc",
+            b"xmlns",
+            b"xmlns:w14",
+            b"xmlns:m",
+            b"xmlns:wp",
+        ];
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -1036,5 +1044,20 @@ mod tests {
         let sect2 = ppr2.sect_pr.as_ref().unwrap();
         assert_eq!(sect2.section_type, Some(ST_SectionType::NextPage));
         assert_eq!(sect2.orientation, Some(ST_PageOrientation::Landscape));
+    }
+
+    #[test]
+    fn root_namespaces_not_duplicated_on_round_trip() {
+        // Regression: w14/m/wp are always emitted on the root. If also captured
+        // into extra_namespaces on parse, re-serialization duplicates the xmlns
+        // attribute and Word rejects the file. Parse a doc that already declares
+        // them, then re-serialize: each must appear exactly once.
+        let src = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body><w:p/></w:body></w:document>"#;
+        let parsed = CT_Document::from_xml(src.as_bytes()).unwrap();
+        let s = String::from_utf8(parsed.to_xml().unwrap()).unwrap();
+        for ns in ["xmlns:w14=", "xmlns:m=", "xmlns:wp="] {
+            assert_eq!(s.matches(ns).count(), 1, "{ns} duplicated: {s}");
+        }
     }
 }
