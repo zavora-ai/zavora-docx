@@ -32,6 +32,10 @@ pub enum MathNode {
     Func(String, Box<MathNode>),
     /// Accent over a base (`m:acc`), e.g. a hat or bar.
     Accent(String, Box<MathNode>),
+    /// A matrix (`m:m`) of rows, each a vector of cell nodes.
+    Matrix(Vec<Vec<MathNode>>),
+    /// A bar over (or under) a base (`m:bar`).
+    Bar(Box<MathNode>),
     /// A sequence of nodes rendered in order (no wrapper element).
     Seq(Vec<MathNode>),
 }
@@ -147,6 +151,26 @@ impl MathNode {
                     Ok(())
                 })?;
                 arg(w, "m:e", base)
+            }),
+            MathNode::Bar(base) => elem(w, "m:bar", |w| {
+                elem(w, "m:barPr", |w| {
+                    let mut p = BytesStart::new("m:pos");
+                    p.push_attribute(("m:val", "top"));
+                    w.write_event(Event::Empty(p))?;
+                    Ok(())
+                })?;
+                arg(w, "m:e", base)
+            }),
+            MathNode::Matrix(rows) => elem(w, "m:m", |w| {
+                for row in rows {
+                    elem(w, "m:mr", |w| {
+                        for cell in row {
+                            arg(w, "m:e", cell)?;
+                        }
+                        Ok(())
+                    })?;
+                }
+                Ok(())
             }),
         }
     }
@@ -425,6 +449,21 @@ mod tests {
         assert!(x.contains("m:oMathPara"), "{x}");
         assert!(x.contains("xmlns:m="), "{x}");
         assert!(x.contains("<m:oMath>"), "{x}");
+    }
+
+    #[test]
+    fn matrix_and_bar() {
+        let m = MathNode::Matrix(vec![
+            vec![MathNode::run("a"), MathNode::run("b")],
+            vec![MathNode::run("c"), MathNode::run("d")],
+        ]);
+        let x = s(&m);
+        assert!(x.contains("<m:m>"), "{x}");
+        assert!(x.contains("<m:mr>"), "{x}");
+        assert_eq!(x.matches("<m:mr>").count(), 2, "{x}");
+        let b = s(&MathNode::Bar(Box::new(MathNode::run("x"))));
+        assert!(b.contains("<m:bar>"), "{b}");
+        assert!(b.contains("<m:barPr>"), "{b}");
     }
 
     #[test]

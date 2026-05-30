@@ -112,8 +112,19 @@ pub struct CT_PPr {
     pub sect_pr: Option<CT_SectPr>,
     /// Drop cap: number of lines to span (2-4 typical). Generates w:framePr.
     pub drop_cap_lines: Option<u32>,
+    /// Formatting-revision mark (pPrChange): author/date + previous para props.
+    pub ppr_change: Option<Box<PPrChange>>,
     /// Extra raw XML elements to include in pPr serialization.
     pub extra_xml: Option<Vec<Vec<u8>>>,
+}
+
+/// A paragraph-formatting revision (`w:pPrChange`): who/when + previous props.
+#[derive(Debug, Clone, Default, PartialEq)]
+#[allow(non_snake_case)]
+pub struct PPrChange {
+    pub author: String,
+    pub date: String,
+    pub previous: Box<CT_PPr>,
 }
 
 #[allow(non_snake_case)]
@@ -136,6 +147,23 @@ impl CT_PPr {
                         ppr.tabs = Some(CT_Tabs::from_xml(reader)?);
                     } else if matches_local_name(name.as_ref(), b"sectPr") {
                         ppr.sect_pr = Some(CT_SectPr::from_xml(reader)?);
+                    } else if matches_local_name(name.as_ref(), b"pPrChange") {
+                        let author = attr_named(e, b"author")?.unwrap_or_default();
+                        let date = attr_named(e, b"date")?.unwrap_or_default();
+                        let mut prev = CT_PPr::default();
+                        let mut b2 = Vec::new();
+                        loop {
+                            match reader.read_event_into(&mut b2)? {
+                                Event::Start(ref ie) if matches_local_name(ie.name().as_ref(), b"pPr") => {
+                                    prev = CT_PPr::from_xml(reader)?;
+                                }
+                                Event::End(ref ie) if matches_local_name(ie.name().as_ref(), b"pPrChange") => break,
+                                Event::Eof => break,
+                                _ => {}
+                            }
+                            b2.clear();
+                        }
+                        ppr.ppr_change = Some(Box::new(PPrChange { author, date, previous: Box::new(prev) }));
                     } else {
                         let raw = crate::raw_xml::capture_element(reader, e)?;
                         ppr.extra_xml.get_or_insert_with(Vec::new).push(raw);
@@ -400,6 +428,19 @@ impl CT_PPr {
             }
         }
 
+        if let Some(ref ch) = self.ppr_change {
+            let mut e = BytesStart::new("w:pPrChange");
+            e.push_attribute(("w:author", ch.author.as_str()));
+            e.push_attribute(("w:date", ch.date.as_str()));
+            writer.write_event(Event::Start(e))?;
+            if ch.previous.is_empty() {
+                writer.write_event(Event::Empty(BytesStart::new("w:pPr")))?;
+            } else {
+                ch.previous.to_xml(writer)?;
+            }
+            writer.write_event(Event::End(BytesEnd::new("w:pPrChange")))?;
+        }
+
         writer.write_event(Event::End(BytesEnd::new("w:pPr")))?;
         Ok(())
     }
@@ -430,6 +471,7 @@ impl CT_PPr {
             && self.num_ilvl.is_none()
             && self.sect_pr.is_none()
             && self.drop_cap_lines.is_none()
+            && self.ppr_change.is_none()
             && self.extra_xml.is_none()
     }
 
@@ -570,8 +612,22 @@ pub struct CT_RPr {
     pub kern: Option<u32>,
     /// Ligatures (w14:ligatures/@w14:val): "none", "standard", "all", etc.
     pub ligatures: Option<String>,
+    /// Proofing language (lang/@w:val), e.g. "en-US", "fr-FR".
+    pub lang: Option<String>,
+    /// Formatting-revision mark (rPrChange): author/date + previous run props.
+    pub rpr_change: Option<Box<RPrChange>>,
     /// Extra raw XML for w14 effects (shadow, glow, outline, reflection, textFill)
     pub extra_xml: Option<Vec<Vec<u8>>>,
+}
+
+/// A run-formatting revision (`w:rPrChange`): who/when, plus the previous props.
+#[derive(Debug, Clone, Default, PartialEq)]
+#[allow(non_snake_case)]
+pub struct RPrChange {
+    pub author: String,
+    pub date: String,
+    /// The run properties as they were before this change.
+    pub previous: Box<CT_RPr>,
 }
 
 #[allow(non_snake_case)]
@@ -668,14 +724,36 @@ impl CT_RPr {
                         rpr.shading = Some(CT_Shd::from_xml_attrs(e)?);
                     } else if matches_local_name(name.as_ref(), b"vanish") {
                         rpr.vanish = Some(parse_toggle(e)?);
+                    } else if matches_local_name(name.as_ref(), b"lang") {
+                        rpr.lang = get_val_attr(e)?;
                     } else {
                         let raw = crate::raw_xml::capture_empty_element(e)?;
                         rpr.extra_xml.get_or_insert_with(Vec::new).push(raw);
                     }
                 }
                 Ok(Event::Start(ref e)) => {
-                    let raw = crate::raw_xml::capture_element(reader, e)?;
-                    rpr.extra_xml.get_or_insert_with(Vec::new).push(raw);
+                    if matches_local_name(e.name().as_ref(), b"rPrChange") {
+                        let author = attr_named(e, b"author")?.unwrap_or_default();
+                        let date = attr_named(e, b"date")?.unwrap_or_default();
+                        // Read inner <w:rPr>...</w:rPr>, then </w:rPrChange>.
+                        let mut prev = CT_RPr::default();
+                        let mut b2 = Vec::new();
+                        loop {
+                            match reader.read_event_into(&mut b2)? {
+                                Event::Start(ref ie) if matches_local_name(ie.name().as_ref(), b"rPr") => {
+                                    prev = CT_RPr::from_xml(reader)?;
+                                }
+                                Event::End(ref ie) if matches_local_name(ie.name().as_ref(), b"rPrChange") => break,
+                                Event::Eof => break,
+                                _ => {}
+                            }
+                            b2.clear();
+                        }
+                        rpr.rpr_change = Some(Box::new(RPrChange { author, date, previous: Box::new(prev) }));
+                    } else {
+                        let raw = crate::raw_xml::capture_element(reader, e)?;
+                        rpr.extra_xml.get_or_insert_with(Vec::new).push(raw);
+                    }
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"rPr") => {
                     break;
@@ -836,10 +914,29 @@ impl CT_RPr {
             writer.write_event(Event::Empty(e))?;
         }
 
+        if let Some(ref lang) = self.lang {
+            let mut e = BytesStart::new("w:lang");
+            e.push_attribute(("w:val", lang.as_str()));
+            writer.write_event(Event::Empty(e))?;
+        }
+
         if let Some(ref extras) = self.extra_xml {
             for raw in extras {
                 writer.get_mut().write_all(raw)?;
             }
+        }
+
+        if let Some(ref ch) = self.rpr_change {
+            let mut e = BytesStart::new("w:rPrChange");
+            e.push_attribute(("w:author", ch.author.as_str()));
+            e.push_attribute(("w:date", ch.date.as_str()));
+            writer.write_event(Event::Start(e))?;
+            if ch.previous.is_empty() {
+                writer.write_event(Event::Empty(BytesStart::new("w:rPr")))?;
+            } else {
+                ch.previous.to_xml(writer)?;
+            }
+            writer.write_event(Event::End(BytesEnd::new("w:rPrChange")))?;
         }
 
         writer.write_event(Event::End(BytesEnd::new("w:rPr")))?;
@@ -876,6 +973,8 @@ impl CT_RPr {
             && self.vanish.is_none()
             && self.kern.is_none()
             && self.ligatures.is_none()
+            && self.lang.is_none()
+            && self.rpr_change.is_none()
             && self.extra_xml.is_none()
     }
 
@@ -963,7 +1062,21 @@ impl CT_RPr {
         if other.vanish.is_some() {
             self.vanish = other.vanish;
         }
+        if other.lang.is_some() {
+            self.lang = other.lang.clone();
+        }
     }
+}
+
+/// Extract a named attribute (by local name) from an element.
+pub(crate) fn attr_named(e: &BytesStart, name: &[u8]) -> Result<Option<String>> {
+    for attr in e.attributes() {
+        let attr = attr?;
+        if matches_local_name(attr.key.as_ref(), name) {
+            return Ok(Some(std::str::from_utf8(&attr.value)?.to_string()));
+        }
+    }
+    Ok(None)
 }
 
 /// Extract the `w:val` attribute from an element.
@@ -1059,6 +1172,20 @@ mod tests {
         let mut w = Writer::new(Vec::new());
         ppr.to_xml(&mut w).unwrap();
         String::from_utf8(w.into_inner()).unwrap()
+    }
+
+    #[test]
+    fn track_change_revisions_round_trip() {
+        // rPrChange carries the previous run props (bold).
+        let rpr = parse_rpr(r#"<w:i/><w:rPrChange w:author="Ed" w:date="2024-01-01T00:00:00Z"><w:rPr><w:b/></w:rPr></w:rPrChange>"#);
+        assert_eq!(rpr.italic, Some(true));
+        let ch = rpr.rpr_change.as_ref().expect("rpr_change parsed");
+        assert_eq!(ch.author, "Ed");
+        assert_eq!(ch.previous.bold, Some(true));
+        let out = rpr_to_string(&rpr);
+        assert!(out.contains("w:rPrChange"), "{out}");
+        assert!(out.contains(r#"w:author="Ed""#), "{out}");
+        assert!(out.contains("<w:b/>"), "previous bold lost: {out}");
     }
 
     #[test]

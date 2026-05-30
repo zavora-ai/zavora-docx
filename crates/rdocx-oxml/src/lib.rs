@@ -11,6 +11,7 @@
 #![allow(clippy::should_implement_trait)]
 
 pub mod app_properties;
+pub mod bookmark;
 pub mod borders;
 pub mod chart;
 pub mod core_properties;

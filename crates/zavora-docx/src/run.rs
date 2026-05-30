@@ -117,6 +117,12 @@ impl<'a> Run<'a> {
         self
     }
 
+    /// Set the proofing language for this run (e.g. "en-US", "fr-FR").
+    pub fn language(mut self, lang: &str) -> Self {
+        self.ensure_rpr().lang = Some(lang.to_string());
+        self
+    }
+
     /// Set highlight color as a hex fill value.
     pub fn highlight(mut self, color: &str) -> Self {
         self.ensure_rpr().shading = Some(CT_Shd {

@@ -32,6 +32,7 @@ pub mod table;
 pub use document::{AccessibilityIssue, Document, ImageInfo, IssueSeverity, LinkInfo, OutlineNode};
 pub use error::{Error, Result};
 pub use length::Length;
+pub use rdocx_oxml::bookmark::CT_Bookmark;
 pub use rdocx_oxml::chart::{Chart, ChartKind, DataLabels, LabelPosition, Series};
 pub use rdocx_oxml::drawing::PicProps;
 pub use rdocx_oxml::math::MathNode;

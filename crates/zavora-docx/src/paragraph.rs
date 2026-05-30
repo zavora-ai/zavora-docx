@@ -180,18 +180,18 @@ impl<'a> Paragraph<'a> {
     }
 
     pub fn bookmark(&mut self, id: u32, name: &str) {
-        let start = format!(
-            r#"<w:bookmarkStart w:id="{}" w:name="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
-            id, name
-        );
-        let end = format!(
-            r#"<w:bookmarkEnd w:id="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
-            id
-        );
+        let bm = rdocx_oxml::bookmark::CT_Bookmark::new(id, name);
         // bookmarkStart before all runs, bookmarkEnd after all runs
-        self.inner.extra_xml.push((0, start.into_bytes()));
+        self.inner.extra_xml.push((0, bm.start_xml()));
         let pos = self.inner.runs.len();
-        self.inner.extra_xml.push((pos, end.into_bytes()));
+        self.inner.extra_xml.push((pos, bm.end_xml()));
+    }
+
+    /// Insert a cross-reference (`REF` field) to a bookmark by name, showing
+    /// the referenced text and updating on field refresh.
+    pub fn cross_reference(&mut self, name: &str) {
+        let bm = rdocx_oxml::bookmark::CT_Bookmark::new(0, name);
+        self.inner.extra_xml.push((self.inner.runs.len(), bm.cross_reference_xml()));
     }
 
     /// Mark the start of a comment range. Place before the commented text runs.

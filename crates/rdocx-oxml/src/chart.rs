@@ -24,6 +24,7 @@ pub enum ChartKind {
     Line,
     Pie,
     Area,
+    Scatter,
 }
 
 /// A data series: a name and one value per category.
@@ -152,12 +153,16 @@ impl Chart {
     }
 
     fn write_plot<W: std::io::Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        if self.kind == ChartKind::Scatter {
+            return self.write_scatter(w);
+        }
         let (tag, extra): (&str, &[(&str, &str)]) = match self.kind {
             ChartKind::Bar => ("c:barChart", &[]),
             ChartKind::Column => ("c:barChart", &[]),
             ChartKind::Line => ("c:lineChart", &[]),
             ChartKind::Pie => ("c:pieChart", &[]),
             ChartKind::Area => ("c:areaChart", &[]),
+            ChartKind::Scatter => unreachable!(),
         };
         let _ = extra;
         w.write_event(Event::Start(BytesStart::new(tag)))?;
@@ -262,9 +267,66 @@ impl Chart {
         Ok(())
     }
 
+    /// Scatter chart: each series plots y-values (series.values) against
+    /// x-values parsed from `categories` (falls back to 1..n if non-numeric).
+    fn write_scatter<W: std::io::Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        w.write_event(Event::Start(BytesStart::new("c:scatterChart")))?;
+        str_el(w, "c:scatterStyle", "lineMarker")?;
+        let xs: Vec<f64> = self
+            .categories
+            .iter()
+            .enumerate()
+            .map(|(i, c)| c.parse().unwrap_or((i + 1) as f64))
+            .collect();
+        for (idx, s) in self.series.iter().enumerate() {
+            w.write_event(Event::Start(BytesStart::new("c:ser")))?;
+            idx_el(w, "c:idx", idx)?;
+            idx_el(w, "c:order", idx)?;
+            // series name
+            w.write_event(Event::Start(BytesStart::new("c:tx")))?;
+            w.write_event(Event::Start(BytesStart::new("c:strRef")))?;
+            str_el(w, "c:f", &format!("Sheet1!$B${}", idx + 1))?;
+            w.write_event(Event::Start(BytesStart::new("c:strCache")))?;
+            idx_el(w, "c:ptCount", 1)?;
+            pt_str(w, 0, &s.name)?;
+            w.write_event(Event::End(BytesEnd::new("c:strCache")))?;
+            w.write_event(Event::End(BytesEnd::new("c:strRef")))?;
+            w.write_event(Event::End(BytesEnd::new("c:tx")))?;
+            // xVal
+            w.write_event(Event::Start(BytesStart::new("c:xVal")))?;
+            self.write_num_ref(w, "Sheet1!$A$1", &xs)?;
+            w.write_event(Event::End(BytesEnd::new("c:xVal")))?;
+            // yVal
+            w.write_event(Event::Start(BytesStart::new("c:yVal")))?;
+            self.write_num_ref(w, &format!("Sheet1!$B${}", idx + 1), &s.values)?;
+            w.write_event(Event::End(BytesEnd::new("c:yVal")))?;
+            w.write_event(Event::End(BytesEnd::new("c:ser")))?;
+        }
+        idx_el(w, "c:axId", 1)?;
+        idx_el(w, "c:axId", 2)?;
+        w.write_event(Event::End(BytesEnd::new("c:scatterChart")))?;
+        Ok(())
+    }
+
+    fn write_num_ref<W: std::io::Write>(&self, w: &mut Writer<W>, f: &str, vals: &[f64]) -> Result<()> {
+        w.write_event(Event::Start(BytesStart::new("c:numRef")))?;
+        str_el(w, "c:f", f)?;
+        w.write_event(Event::Start(BytesStart::new("c:numCache")))?;
+        str_el(w, "c:formatCode", "General")?;
+        idx_el(w, "c:ptCount", vals.len())?;
+        for (i, v) in vals.iter().enumerate() {
+            pt_num(w, i, *v)?;
+        }
+        w.write_event(Event::End(BytesEnd::new("c:numCache")))?;
+        w.write_event(Event::End(BytesEnd::new("c:numRef")))?;
+        Ok(())
+    }
+
     fn write_axes<W: std::io::Write>(&self, w: &mut Writer<W>) -> Result<()> {
         // Category axis
-        w.write_event(Event::Start(BytesStart::new("c:catAx")))?;
+        // First axis: value axis for scatter (numeric X), category axis otherwise.
+        let first_ax = if self.kind == ChartKind::Scatter { "c:valAx" } else { "c:catAx" };
+        w.write_event(Event::Start(BytesStart::new(first_ax)))?;
         idx_el(w, "c:axId", 1)?;
         w.write_event(Event::Start(BytesStart::new("c:scaling")))?;
         str_el(w, "c:orientation", "minMax")?;
@@ -272,7 +334,7 @@ impl Chart {
         bool_el(w, "c:delete", false)?;
         str_el(w, "c:axPos", if self.kind == ChartKind::Bar { "l" } else { "b" })?;
         idx_el(w, "c:crossAx", 2)?;
-        w.write_event(Event::End(BytesEnd::new("c:catAx")))?;
+        w.write_event(Event::End(BytesEnd::new(first_ax)))?;
         // Value axis
         w.write_event(Event::Start(BytesStart::new("c:valAx")))?;
         idx_el(w, "c:axId", 2)?;
@@ -405,6 +467,30 @@ mod tests {
         assert!(x.contains("<c:v>Q2</c:v>"), "{x}");
         assert!(x.contains("<c:v>20</c:v>"), "{x}");
         assert!(x.contains("<c:catAx>"), "{x}");
+    }
+
+    #[test]
+    fn scatter_chart_xy() {
+        let c = Chart {
+            kind: ChartKind::Scatter,
+            title: Some("XY".into()),
+            categories: vec!["1".into(), "2".into(), "3".into()],
+            series: vec![Series { name: "pts".into(), values: vec![2.0, 4.0, 6.0] }],
+            labels: None,
+        };
+        let bytes = c.to_part_bytes().unwrap();
+        let mut rdr = quick_xml::Reader::from_reader(bytes.as_slice());
+        loop {
+            match rdr.read_event().expect("well-formed") {
+                quick_xml::events::Event::Eof => break,
+                _ => {}
+            }
+        }
+        let x = String::from_utf8(bytes).unwrap();
+        assert!(x.contains("c:scatterChart"), "{x}");
+        assert!(x.contains("<c:xVal>"), "{x}");
+        assert!(x.contains("<c:yVal>"), "{x}");
+        assert!(!x.contains("<c:catAx>"), "{x}");
     }
 
     #[test]
