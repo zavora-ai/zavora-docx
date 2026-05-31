@@ -59,7 +59,7 @@ fn generate_header_banner_doc(path: &Path) {
     doc.set_raw_header_with_images(
         banner.clone(),
         &[("rId1", &logo_img, "logo.png")],
-        rdocx_oxml::header_footer::HdrFtrType::Default,
+        zavora_docx_oxml::header_footer::HdrFtrType::Default,
     );
 
     // Use a different first page header (same banner, different color)
@@ -79,7 +79,7 @@ fn generate_header_banner_doc(path: &Path) {
     doc.set_raw_header_with_images(
         first_page_banner,
         &[("rId1", &logo_img, "logo.png")],
-        rdocx_oxml::header_footer::HdrFtrType::First,
+        zavora_docx_oxml::header_footer::HdrFtrType::First,
     );
 
     // Footer

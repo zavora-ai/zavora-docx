@@ -1,6 +1,6 @@
 [package]
-name = "zavora-docx"
-description = "High-level API for reading, writing, and converting DOCX documents"
+name = "zavora-docx-layout"
+description = "Layout engine for converting DOCX flow model to positioned frames"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,15 +10,14 @@ repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
-readme = "../../README.md"
+
+[features]
+bundled-fonts = []
 
 [dependencies]
-zavora-docx-opc = { workspace = true }
 zavora-docx-oxml = { workspace = true }
-zavora-docx-layout = { workspace = true }
-zavora-docx-pdf = { workspace = true }
-zavora-docx-html = { workspace = true }
 thiserror = { workspace = true }
-regex = "1"
-
-[dev-dependencies]
+fontdb = { workspace = true }
+rustybuzz = { workspace = true }
+ttf-parser = { workspace = true }
+unicode-linebreak = { workspace = true }

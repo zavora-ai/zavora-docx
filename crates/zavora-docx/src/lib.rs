@@ -32,11 +32,11 @@ pub mod table;
 pub use document::{AccessibilityIssue, Document, ImageInfo, IssueSeverity, LinkInfo, OutlineNode};
 pub use error::{Error, Result};
 pub use length::Length;
-pub use rdocx_oxml::bookmark::CT_Bookmark;
-pub use rdocx_oxml::chart::{Chart, ChartKind, DataLabels, LabelPosition, Series};
-pub use rdocx_oxml::drawing::PicProps;
-pub use rdocx_oxml::math::MathNode;
-pub use rdocx_oxml::sdt::SdtKind;
+pub use zavora_docx_oxml::bookmark::CT_Bookmark;
+pub use zavora_docx_oxml::chart::{Chart, ChartKind, DataLabels, LabelPosition, Series};
+pub use zavora_docx_oxml::drawing::PicProps;
+pub use zavora_docx_oxml::math::MathNode;
+pub use zavora_docx_oxml::sdt::SdtKind;
 pub use paragraph::{
     Alignment, BorderStyle, Paragraph, ParagraphRef, SectionBreak, TabAlignment, TabLeader,
 };

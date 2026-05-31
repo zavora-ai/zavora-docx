@@ -1,6 +1,6 @@
 //! Length unit type with convenient constructors.
 
-use rdocx_oxml::units::{Emu, HalfPoint, Twips};
+use zavora_docx_oxml::units::{Emu, HalfPoint, Twips};
 
 /// A length measurement that can be expressed in various units.
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -1,7 +1,7 @@
 //! Style access and manipulation for documents.
 
-use rdocx_oxml::properties::{CT_PPr, CT_RPr};
-use rdocx_oxml::styles::{CT_Style, CT_Styles, StyleType};
+use zavora_docx_oxml::properties::{CT_PPr, CT_RPr};
+use zavora_docx_oxml::styles::{CT_Style, CT_Styles, StyleType};
 
 /// An immutable reference to a style definition.
 pub struct Style<'a> {
@@ -93,7 +93,7 @@ impl StyleBuilder {
 
     /// Text alignment: "left", "right", "center", "both" (justified).
     pub fn align(mut self, jc: &str) -> Self {
-        use rdocx_oxml::shared::ST_Jc;
+        use zavora_docx_oxml::shared::ST_Jc;
         self.ppr().jc = Some(match jc {
             "center" => ST_Jc::Center,
             "right" => ST_Jc::Right,
@@ -118,7 +118,7 @@ impl StyleBuilder {
     /// Line spacing as a multiple of single spacing (1.0 = single, 1.5, 2.0…).
     pub fn line_spacing(mut self, multiple: f64) -> Self {
         let ppr = self.ppr();
-        ppr.line_spacing = Some(rdocx_oxml::units::Twips((multiple * 240.0).round() as i32));
+        ppr.line_spacing = Some(zavora_docx_oxml::units::Twips((multiple * 240.0).round() as i32));
         ppr.line_rule = Some("auto".to_string());
         self
     }
@@ -167,7 +167,7 @@ impl StyleBuilder {
 
     /// Font size in points.
     pub fn size(mut self, pt: f64) -> Self {
-        let hp = rdocx_oxml::units::HalfPoint((pt * 2.0).round() as u32);
+        let hp = zavora_docx_oxml::units::HalfPoint((pt * 2.0).round() as u32);
         let rpr = self.rpr();
         rpr.sz = Some(hp);
         rpr.sz_cs = Some(hp);
@@ -204,7 +204,7 @@ impl StyleBuilder {
 
     /// Letter spacing (character spacing) in points.
     pub fn letter_spacing(mut self, pt: f64) -> Self {
-        self.rpr().spacing = Some(rdocx_oxml::units::Twips((pt * 20.0).round() as i32));
+        self.rpr().spacing = Some(zavora_docx_oxml::units::Twips((pt * 20.0).round() as i32));
         self
     }
 
@@ -325,7 +325,7 @@ fn collect_style_chain<'a>(style_id: &str, styles: &'a CT_Styles) -> Vec<&'a CT_
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rdocx_oxml::units::{HalfPoint, Twips};
+    use zavora_docx_oxml::units::{HalfPoint, Twips};
 
     fn test_styles() -> CT_Styles {
         let mut styles = CT_Styles::new_default();

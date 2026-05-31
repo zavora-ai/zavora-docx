@@ -5,16 +5,16 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("OPC package error: {0}")]
-    Opc(#[from] rdocx_opc::OpcError),
+    Opc(#[from] zavora_docx_opc::OpcError),
 
     #[error("OXML parsing error: {0}")]
-    Oxml(#[from] rdocx_oxml::OxmlError),
+    Oxml(#[from] zavora_docx_oxml::OxmlError),
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
     #[error("layout error: {0}")]
-    Layout(#[from] rdocx_layout::LayoutError),
+    Layout(#[from] zavora_docx_layout::LayoutError),
 
     #[error("document has no main document part")]
     NoDocumentPart,

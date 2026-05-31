@@ -9,8 +9,8 @@ fn main() {
     let doc = Document::new();
     match doc.to_pdf() {
         Ok(bytes) => {
-            std::fs::write("/tmp/rdocx_simple.pdf", &bytes).unwrap();
-            println!("Simple PDF: {} bytes -> /tmp/rdocx_simple.pdf", bytes.len());
+            std::fs::write("/tmp/zavora_docx_simple.pdf", &bytes).unwrap();
+            println!("Simple PDF: {} bytes -> /tmp/zavora_docx_simple.pdf", bytes.len());
         }
         Err(e) => println!("Simple PDF failed: {e}"),
     }
@@ -18,7 +18,7 @@ fn main() {
     // Test 2: Document with content
     let mut doc = Document::new();
     doc.set_title("Test PDF Document");
-    doc.set_author("rdocx-pdf");
+    doc.set_author("zavora-docx-pdf");
     doc.add_paragraph("Chapter 1: Introduction")
         .style("Heading1");
     doc.add_paragraph(
@@ -43,9 +43,9 @@ fn main() {
 
     match doc.to_pdf() {
         Ok(bytes) => {
-            std::fs::write("/tmp/rdocx_content.pdf", &bytes).unwrap();
+            std::fs::write("/tmp/zavora_docx_content.pdf", &bytes).unwrap();
             println!(
-                "Content PDF: {} bytes -> /tmp/rdocx_content.pdf",
+                "Content PDF: {} bytes -> /tmp/zavora_docx_content.pdf",
                 bytes.len()
             );
         }
@@ -60,9 +60,9 @@ fn main() {
     match Document::open(showcase_path) {
         Ok(doc) => match doc.to_pdf() {
             Ok(bytes) => {
-                std::fs::write("/tmp/rdocx_showcase.pdf", &bytes).unwrap();
+                std::fs::write("/tmp/zavora_docx_showcase.pdf", &bytes).unwrap();
                 println!(
-                    "Showcase PDF: {} bytes -> /tmp/rdocx_showcase.pdf",
+                    "Showcase PDF: {} bytes -> /tmp/zavora_docx_showcase.pdf",
                     bytes.len()
                 );
             }

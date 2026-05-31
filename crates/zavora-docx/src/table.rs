@@ -1,13 +1,13 @@
 //! Table — a block-level container for rows and cells of content.
 
-use rdocx_oxml::borders::CT_BorderEdge;
-use rdocx_oxml::properties::CT_Shd;
-use rdocx_oxml::shared::ST_Jc;
-use rdocx_oxml::table::{
+use zavora_docx_oxml::borders::CT_BorderEdge;
+use zavora_docx_oxml::properties::CT_Shd;
+use zavora_docx_oxml::shared::ST_Jc;
+use zavora_docx_oxml::table::{
     CT_Row, CT_Tbl, CT_TblBorders, CT_TblCellMar, CT_TblPr, CT_TblWidth, CT_Tc, CT_TcPr, CT_TrPr,
     ST_VerticalJc, VMerge,
 };
-use rdocx_oxml::text::CT_P;
+use zavora_docx_oxml::text::CT_P;
 
 use crate::Length;
 use crate::paragraph::{Paragraph, ParagraphRef};
@@ -69,8 +69,8 @@ impl<'a> Table<'a> {
     /// width to match, then forces fixed layout so Word honors the widths.
     /// `widths` length should equal the column count.
     pub fn column_widths(mut self, widths: &[Length]) -> Self {
-        use rdocx_oxml::table::{CT_TblGrid, CT_TblGridCol, CT_TblWidth};
-        use rdocx_oxml::units::Twips;
+        use zavora_docx_oxml::table::{CT_TblGrid, CT_TblGridCol, CT_TblWidth};
+        use zavora_docx_oxml::units::Twips;
         let cols: Vec<Twips> = widths.iter().map(|w| Twips(w.as_twips().0)).collect();
         let total: i32 = cols.iter().map(|t| t.0).sum();
         self.inner.grid = Some(CT_TblGrid {
@@ -156,7 +156,7 @@ impl<'a> Table<'a> {
             if i % 2 == 1 {
                 for cell in &mut self.inner.rows[i].cells {
                     let pr = cell.properties.get_or_insert_with(Default::default);
-                    pr.shading = Some(rdocx_oxml::properties::CT_Shd {
+                    pr.shading = Some(zavora_docx_oxml::properties::CT_Shd {
                         val: "clear".to_string(),
                         color: Some("auto".to_string()),
                         fill: Some(band_color.to_string()),
@@ -171,11 +171,11 @@ impl<'a> Table<'a> {
         if let Some(row) = self.inner.rows.first_mut() {
             row.properties.get_or_insert_with(Default::default).header = Some(true);
             for cell in &mut row.cells {
-                cell.properties.get_or_insert_with(Default::default).shading = Some(rdocx_oxml::properties::CT_Shd {
+                cell.properties.get_or_insert_with(Default::default).shading = Some(zavora_docx_oxml::properties::CT_Shd {
                     val: "clear".to_string(), color: Some("auto".to_string()), fill: Some(bg_color.to_string()),
                 });
                 for content in &mut cell.content {
-                    if let rdocx_oxml::table::CellContent::Paragraph(p) = content {
+                    if let zavora_docx_oxml::table::CellContent::Paragraph(p) = content {
                         for run in &mut p.runs {
                             let rpr = run.properties.get_or_insert_with(Default::default);
                             rpr.bold = Some(true);
@@ -189,7 +189,7 @@ impl<'a> Table<'a> {
 
     /// Add a new row with the given number of cells and return a mutable reference.
     pub fn add_row(&mut self, cols: usize) -> Row<'_> {
-        use rdocx_oxml::table::{CT_Row, CT_Tc};
+        use zavora_docx_oxml::table::{CT_Row, CT_Tc};
         let mut row = CT_Row::new();
         for _ in 0..cols {
             row.cells.push(CT_Tc::new());
@@ -283,7 +283,7 @@ impl<'a> Cell<'a> {
 
     /// Set the text of the first paragraph (replacing existing content).
     pub fn set_text(&mut self, text: &str) {
-        use rdocx_oxml::table::CellContent;
+        use zavora_docx_oxml::table::CellContent;
         // Find first paragraph or create one
         let first_para = self.inner.content.iter_mut().find_map(|c| {
             if let CellContent::Paragraph(p) = c {
@@ -308,7 +308,7 @@ impl<'a> Cell<'a> {
 
     /// Add a paragraph to the cell and return a mutable reference.
     pub fn add_paragraph(&mut self, text: &str) -> Paragraph<'_> {
-        use rdocx_oxml::table::CellContent;
+        use zavora_docx_oxml::table::CellContent;
         let mut p = CT_P::new();
         if !text.is_empty() {
             p.add_run(text);
@@ -328,9 +328,9 @@ impl<'a> Cell<'a> {
     /// pass it here along with the desired display dimensions. This matches
     /// the python-docx `run.add_picture()` pattern.
     pub fn add_picture(&mut self, rel_id: &str, width: Length, height: Length) {
-        use rdocx_oxml::drawing::{CT_Drawing, CT_Inline};
-        use rdocx_oxml::table::CellContent;
-        use rdocx_oxml::text::{CT_R, RunContent};
+        use zavora_docx_oxml::drawing::{CT_Drawing, CT_Inline};
+        use zavora_docx_oxml::table::CellContent;
+        use zavora_docx_oxml::text::{CT_R, RunContent};
 
         let inline = CT_Inline::new(rel_id, width.to_emu(), height.to_emu());
         let drawing = CT_Drawing::inline(inline);
@@ -350,7 +350,7 @@ impl<'a> Cell<'a> {
     /// Call this before adding content to avoid a spurious blank line at the
     /// top of the cell — mirrors the `add_html_block` behaviour in python-docx.
     pub fn remove_first_empty_paragraph(&mut self) {
-        use rdocx_oxml::table::CellContent;
+        use zavora_docx_oxml::table::CellContent;
         if let Some(pos) = self.inner.content.iter().position(|c| {
             if let CellContent::Paragraph(p) = c {
                 p.text().trim().is_empty()
@@ -418,10 +418,10 @@ impl<'a> Cell<'a> {
 
     /// Add a nested table inside this cell.
     pub fn add_table(&mut self, rows: usize, cols: usize) -> Table<'_> {
-        use rdocx_oxml::table::{
+        use zavora_docx_oxml::table::{
             CT_Row, CT_Tbl, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc, CellContent,
         };
-        use rdocx_oxml::units::Twips;
+        use zavora_docx_oxml::units::Twips;
 
         // Default nested table column width: use equal splits of 4500tw (~3.125")
         let col_width = Twips(4500 / cols as i32);

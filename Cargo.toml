@@ -1,16 +1,16 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/rdocx-opc",
-    "crates/rdocx-oxml",
+    "crates/zavora-docx-opc",
+    "crates/zavora-docx-oxml",
     "crates/zavora-docx",
-    "crates/rdocx-layout",
-    "crates/rdocx-pdf",
-    "crates/rdocx-html",
-    "crates/rdocx-cli",
+    "crates/zavora-docx-layout",
+    "crates/zavora-docx-pdf",
+    "crates/zavora-docx-html",
+    "crates/zavora-docx-cli",
 ]
 exclude = [
-    "crates/rdocx-wasm",
+    "crates/zavora-docx-wasm",
 ]
 
 [workspace.package]
@@ -26,12 +26,12 @@ categories = ["parser-implementations", "text-processing"]
 
 [workspace.dependencies]
 # Internal crates
-rdocx-opc = { path = "crates/rdocx-opc", version = "0.1.3" }
-rdocx-oxml = { path = "crates/rdocx-oxml", version = "0.1.3" }
+zavora-docx-opc = { path = "crates/zavora-docx-opc", version = "0.1.3" }
+zavora-docx-oxml = { path = "crates/zavora-docx-oxml", version = "0.1.3" }
 zavora-docx = { path = "crates/zavora-docx", version = "0.1.3" }
-rdocx-layout = { path = "crates/rdocx-layout", version = "0.1.3" }
-rdocx-pdf = { path = "crates/rdocx-pdf", version = "0.1.3" }
-rdocx-html = { path = "crates/rdocx-html", version = "0.1.3" }
+zavora-docx-layout = { path = "crates/zavora-docx-layout", version = "0.1.3" }
+zavora-docx-pdf = { path = "crates/zavora-docx-pdf", version = "0.1.3" }
+zavora-docx-html = { path = "crates/zavora-docx-html", version = "0.1.3" }
 
 # External dependencies
 zip = "8.1"

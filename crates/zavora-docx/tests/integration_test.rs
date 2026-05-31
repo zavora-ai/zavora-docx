@@ -89,7 +89,7 @@ fn round_trip_preserves_styles() {
 #[test]
 fn save_and_load_file() {
     let dir = std::env::temp_dir();
-    let path = dir.join("rdocx_test_output.docx");
+    let path = dir.join("zavora_docx_test_output.docx");
 
     // Create and save
     let mut doc = Document::new();
@@ -1477,7 +1477,7 @@ fn to_pdf_with_metadata() {
         assert!(pdf_bytes.starts_with(b"%PDF"));
         // Metadata should be embedded in the PDF
         let pdf_str = String::from_utf8_lossy(&pdf_bytes);
-        assert!(pdf_str.contains("Test Document") || pdf_str.contains("rdocx-pdf"));
+        assert!(pdf_str.contains("Test Document") || pdf_str.contains("zavora-docx-pdf"));
     }
 }
 
@@ -1486,7 +1486,7 @@ fn save_pdf_to_file() {
     let mut doc = Document::new();
     doc.add_paragraph("PDF file test");
 
-    let path = "/tmp/rdocx_test_output.pdf";
+    let path = "/tmp/zavora_docx_test_output.pdf";
     let result = doc.save_pdf(path);
     if result.is_ok() {
         let bytes = std::fs::read(path).unwrap();

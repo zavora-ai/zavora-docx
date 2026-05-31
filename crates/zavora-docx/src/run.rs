@@ -1,9 +1,9 @@
 //! Run — a contiguous stretch of text with uniform formatting.
 
-use rdocx_oxml::properties::{CT_RPr, CT_Shd};
-use rdocx_oxml::shared::ST_Underline;
-use rdocx_oxml::text::{CT_R, CT_Text, RunContent};
-use rdocx_oxml::units::{HalfPoint, Twips};
+use zavora_docx_oxml::properties::{CT_RPr, CT_Shd};
+use zavora_docx_oxml::shared::ST_Underline;
+use zavora_docx_oxml::text::{CT_R, CT_Text, RunContent};
+use zavora_docx_oxml::units::{HalfPoint, Twips};
 
 use crate::Length;
 

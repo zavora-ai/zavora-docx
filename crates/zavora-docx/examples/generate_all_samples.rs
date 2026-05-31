@@ -588,8 +588,8 @@ fn generate_feature_showcase(_samples_dir: &Path) -> Document {
         StyleBuilder::paragraph("CustomHighlight", "Custom Highlight")
             .based_on("Normal")
             .paragraph_properties({
-                let mut ppr = rdocx_oxml::properties::CT_PPr::default();
-                ppr.shading = Some(rdocx_oxml::properties::CT_Shd {
+                let mut ppr = zavora_docx_oxml::properties::CT_PPr::default();
+                ppr.shading = Some(zavora_docx_oxml::properties::CT_Shd {
                     val: "clear".to_string(),
                     color: None,
                     fill: Some("FFF2CC".to_string()),
@@ -597,7 +597,7 @@ fn generate_feature_showcase(_samples_dir: &Path) -> Document {
                 ppr
             })
             .run_properties({
-                let mut rpr = rdocx_oxml::properties::CT_RPr::default();
+                let mut rpr = zavora_docx_oxml::properties::CT_RPr::default();
                 rpr.bold = Some(true);
                 rpr.color = Some("C45911".to_string());
                 rpr
@@ -718,7 +718,7 @@ fn generate_proposal(_samples_dir: &Path) -> Document {
     doc.set_raw_header_with_images(
         banner,
         &[("rId1", &logo_img, "logo.png")],
-        rdocx_oxml::header_footer::HdrFtrType::Default,
+        zavora_docx_oxml::header_footer::HdrFtrType::Default,
     );
     doc.set_different_first_page(true);
     let cover_banner = build_header_banner_xml(
@@ -736,7 +736,7 @@ fn generate_proposal(_samples_dir: &Path) -> Document {
     doc.set_raw_header_with_images(
         cover_banner,
         &[("rId1", &logo_img, "logo.png")],
-        rdocx_oxml::header_footer::HdrFtrType::First,
+        zavora_docx_oxml::header_footer::HdrFtrType::First,
     );
     doc.set_margins(
         Length::twips(2292),
@@ -752,11 +752,11 @@ fn generate_proposal(_samples_dir: &Path) -> Document {
         StyleBuilder::paragraph("ProposalTitle", "Proposal Title")
             .based_on("Normal")
             .run_properties({
-                let mut rpr = rdocx_oxml::properties::CT_RPr::default();
+                let mut rpr = zavora_docx_oxml::properties::CT_RPr::default();
                 rpr.bold = Some(true);
                 rpr.font_ascii = Some("Georgia".to_string());
                 rpr.font_hansi = Some("Georgia".to_string());
-                rpr.sz = Some(rdocx_oxml::HalfPoint(56)); // half-points → 28pt
+                rpr.sz = Some(zavora_docx_oxml::HalfPoint(56)); // half-points → 28pt
                 rpr.color = Some("1B2A4A".to_string());
                 rpr
             }),
@@ -1681,7 +1681,7 @@ fn generate_letter(_samples_dir: &Path) -> Document {
     doc.set_raw_header_with_images(
         banner,
         &[("rId1", &logo_img, "logo.png")],
-        rdocx_oxml::header_footer::HdrFtrType::Default,
+        zavora_docx_oxml::header_footer::HdrFtrType::Default,
     );
     doc.set_margins(
         Length::twips(2000),

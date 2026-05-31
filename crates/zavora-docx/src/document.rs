@@ -2,19 +2,19 @@
 
 use std::path::Path;
 
-use rdocx_opc::OpcPackage;
-use rdocx_opc::relationship::rel_types;
-use rdocx_oxml::document::{BodyContent, CT_Columns, CT_Document, CT_SectPr};
-use rdocx_oxml::drawing::{CT_Anchor, CT_Drawing, CT_Inline};
-use rdocx_oxml::header_footer::{CT_HdrFtr, HdrFtrRef, HdrFtrType};
-use rdocx_oxml::numbering::CT_Numbering;
-use rdocx_oxml::properties::{CT_PPr, CT_RPr};
-use rdocx_oxml::shared::{ST_PageOrientation, ST_SectionType};
-use rdocx_oxml::styles::CT_Styles;
-use rdocx_oxml::table::CT_Tbl;
-use rdocx_oxml::text::{CT_P, CT_R, RunContent};
+use zavora_docx_opc::OpcPackage;
+use zavora_docx_opc::relationship::rel_types;
+use zavora_docx_oxml::document::{BodyContent, CT_Columns, CT_Document, CT_SectPr};
+use zavora_docx_oxml::drawing::{CT_Anchor, CT_Drawing, CT_Inline};
+use zavora_docx_oxml::header_footer::{CT_HdrFtr, HdrFtrRef, HdrFtrType};
+use zavora_docx_oxml::numbering::CT_Numbering;
+use zavora_docx_oxml::properties::{CT_PPr, CT_RPr};
+use zavora_docx_oxml::shared::{ST_PageOrientation, ST_SectionType};
+use zavora_docx_oxml::styles::CT_Styles;
+use zavora_docx_oxml::table::CT_Tbl;
+use zavora_docx_oxml::text::{CT_P, CT_R, RunContent};
 
-use rdocx_oxml::core_properties::CoreProperties;
+use zavora_docx_oxml::core_properties::CoreProperties;
 
 use crate::Length;
 use crate::error::{Error, Result};
@@ -47,8 +47,8 @@ pub struct Document {
     styles: CT_Styles,
     numbering: Option<CT_Numbering>,
     core_properties: Option<CoreProperties>,
-    footnotes: Option<rdocx_oxml::footnotes::CT_Footnotes>,
-    endnotes: Option<rdocx_oxml::footnotes::CT_Footnotes>,
+    footnotes: Option<zavora_docx_oxml::footnotes::CT_Footnotes>,
+    endnotes: Option<zavora_docx_oxml::footnotes::CT_Footnotes>,
     comments: Vec<CommentData>,
     protection_type: Option<String>,
     /// Whether to force Word to recalculate fields (e.g. TOC PAGEREF) on open.
@@ -62,9 +62,9 @@ pub struct Document {
     /// Cached count of image media parts (avoids rescanning parts on each embed).
     image_counter: usize,
     /// Typed document settings (new settings + round-trip of loaded settings.xml).
-    settings: rdocx_oxml::settings::CT_Settings,
+    settings: zavora_docx_oxml::settings::CT_Settings,
     /// Extended properties (docProps/app.xml).
-    app_properties: Option<rdocx_oxml::app_properties::AppProperties>,
+    app_properties: Option<zavora_docx_oxml::app_properties::AppProperties>,
     /// Fonts to embed: (family name, raw TTF/OTF bytes).
     embedded_fonts: Vec<(String, Vec<u8>)>,
     /// Building blocks / Quick Parts (name, content text) for glossary/document.xml.
@@ -100,7 +100,7 @@ impl Document {
             auto_hyphenation: false,
             doc_part_name: "/word/document.xml".to_string(),
             image_counter: 0,
-            settings: rdocx_oxml::settings::CT_Settings::default(),
+            settings: zavora_docx_oxml::settings::CT_Settings::default(),
             app_properties: None,
             embedded_fonts: Vec::new(),
             building_blocks: Vec::new(),
@@ -177,27 +177,27 @@ impl Document {
         let footnotes = if let Some(rels) = package.get_part_rels(&doc_part_name) {
             if let Some(rel) = rels.get_by_type(rel_types::FOOTNOTES) {
                 let part = OpcPackage::resolve_rel_target(&doc_part_name, &rel.target);
-                package.get_part(&part).and_then(|xml| rdocx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
+                package.get_part(&part).and_then(|xml| zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
             } else { None }
         } else { None };
 
         let endnotes = if let Some(rels) = package.get_part_rels(&doc_part_name) {
             if let Some(rel) = rels.get_by_type(rel_types::ENDNOTES) {
                 let part = OpcPackage::resolve_rel_target(&doc_part_name, &rel.target);
-                package.get_part(&part).and_then(|xml| rdocx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
+                package.get_part(&part).and_then(|xml| zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
             } else { None }
         } else { None };
 
         // Load settings.xml (typed; unknown children preserved) for round-trip.
         let settings = package
             .get_part("/word/settings.xml")
-            .and_then(|xml| rdocx_oxml::settings::CT_Settings::from_xml(xml).ok())
+            .and_then(|xml| zavora_docx_oxml::settings::CT_Settings::from_xml(xml).ok())
             .unwrap_or_default();
 
         // Load extended properties (docProps/app.xml) for round-trip.
         let app_properties = package
             .get_part("/docProps/app.xml")
-            .and_then(|xml| rdocx_oxml::app_properties::AppProperties::from_xml(xml).ok());
+            .and_then(|xml| zavora_docx_oxml::app_properties::AppProperties::from_xml(xml).ok());
 
         Ok(Document {
             package,
@@ -547,11 +547,11 @@ impl Document {
     /// display text shown inside the control.
     pub fn add_content_control(
         &mut self,
-        kind: rdocx_oxml::sdt::SdtKind,
+        kind: zavora_docx_oxml::sdt::SdtKind,
         tag: &str,
         placeholder: Option<&str>,
     ) {
-        let mut sdt = rdocx_oxml::sdt::CT_Sdt::new(kind, tag);
+        let mut sdt = zavora_docx_oxml::sdt::CT_Sdt::new(kind, tag);
         sdt.text = placeholder.map(|s| s.to_string());
         if let Ok(bytes) = sdt.to_bytes() {
             self.document.body.content.push(BodyContent::RawXml(bytes));
@@ -559,7 +559,7 @@ impl Document {
     }
 
     /// Append a block-level mathematical equation built from a [`MathNode`] tree.
-    pub fn add_equation(&mut self, math: &rdocx_oxml::math::MathNode) {
+    pub fn add_equation(&mut self, math: &zavora_docx_oxml::math::MathNode) {
         if let Ok(bytes) = math.to_omath_para_bytes() {
             // Math is paragraph content (EG_PContent): wrap the oMathPara in a
             // w:p, the way Word writes block equations. A bare oMathPara under
@@ -574,15 +574,15 @@ impl Document {
     /// Append a block-level equation parsed from a LaTeX-subset string
     /// (e.g. `\frac{a}{b}^2`, `\sum_{i=1}^{n} i`, `\sqrt{x}`).
     pub fn add_equation_latex(&mut self, latex: &str) {
-        let math = rdocx_oxml::math::from_latex(latex);
+        let math = zavora_docx_oxml::math::from_latex(latex);
         self.add_equation(&math);
     }
 
     /// Append a rectangular text box containing `lines`, sized in inches.
     pub fn add_text_box(&mut self, width: Length, height: Length, lines: Vec<String>) {
-        let shape = rdocx_oxml::shapes::Shape::text_box(
-            rdocx_oxml::units::Emu(width.to_emu()),
-            rdocx_oxml::units::Emu(height.to_emu()),
+        let shape = zavora_docx_oxml::shapes::Shape::text_box(
+            zavora_docx_oxml::units::Emu(width.to_emu()),
+            zavora_docx_oxml::units::Emu(height.to_emu()),
             lines,
         );
         self.push_shape(shape);
@@ -591,9 +591,9 @@ impl Document {
     /// Append a preset shape (e.g. "rect", "ellipse", "roundRect", "rightArrow"),
     /// sized in inches, with an optional solid fill color (hex).
     pub fn add_shape(&mut self, width: Length, height: Length, geom: &str, fill: Option<&str>) {
-        let mut shape = rdocx_oxml::shapes::Shape::preset(
-            rdocx_oxml::units::Emu(width.to_emu()),
-            rdocx_oxml::units::Emu(height.to_emu()),
+        let mut shape = zavora_docx_oxml::shapes::Shape::preset(
+            zavora_docx_oxml::units::Emu(width.to_emu()),
+            zavora_docx_oxml::units::Emu(height.to_emu()),
             geom,
         );
         shape.fill = fill.map(|s| s.to_string());
@@ -601,7 +601,7 @@ impl Document {
     }
 
     /// Wrap a shape's drawing run in a paragraph and push it into the body.
-    fn push_shape(&mut self, shape: rdocx_oxml::shapes::Shape) {
+    fn push_shape(&mut self, shape: zavora_docx_oxml::shapes::Shape) {
         if let Ok(run) = shape.to_run_bytes() {
             let mut p = b"<w:p>".to_vec();
             p.extend_from_slice(&run);
@@ -614,11 +614,11 @@ impl Document {
     /// the content-type and relationship, and inserts the referencing drawing.
     pub fn add_chart(
         &mut self,
-        chart: &rdocx_oxml::chart::Chart,
+        chart: &zavora_docx_oxml::chart::Chart,
         width: Length,
         height: Length,
     ) {
-        use rdocx_opc::relationship::rel_types;
+        use zavora_docx_opc::relationship::rel_types;
         let part_xml = match chart.to_part_bytes() {
             Ok(b) => b,
             Err(_) => return,
@@ -645,8 +645,8 @@ impl Document {
             .add(rel_types::CHART, &rel_target);
         if let Ok(run) = chart.to_run_bytes(
             &rel_id,
-            rdocx_oxml::units::Emu(width.to_emu()),
-            rdocx_oxml::units::Emu(height.to_emu()),
+            zavora_docx_oxml::units::Emu(width.to_emu()),
+            zavora_docx_oxml::units::Emu(height.to_emu()),
         ) {
             let mut p = b"<w:p>".to_vec();
             p.extend_from_slice(&run);
@@ -692,8 +692,8 @@ impl Document {
     /// Add a table with the specified number of rows and columns.
     /// Returns a mutable reference for further configuration.
     pub fn add_table(&mut self, rows: usize, cols: usize) -> Table<'_> {
-        use rdocx_oxml::table::{CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc};
-        use rdocx_oxml::units::Twips;
+        use zavora_docx_oxml::table::{CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc};
+        use zavora_docx_oxml::units::Twips;
 
         // Default column width: divide 9360tw (6.5" printable at 1" margins) evenly
         let col_width = Twips(9360 / cols as i32);
@@ -759,8 +759,8 @@ impl Document {
     /// Returns a mutable `Table` for further configuration.
     /// Panics if `index > content_count()`.
     pub fn insert_table(&mut self, index: usize, rows: usize, cols: usize) -> Table<'_> {
-        use rdocx_oxml::table::{CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc};
-        use rdocx_oxml::units::Twips;
+        use zavora_docx_oxml::table::{CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc};
+        use zavora_docx_oxml::units::Twips;
 
         let col_width = Twips(9360 / cols as i32);
         let grid = CT_TblGrid {
@@ -847,7 +847,7 @@ impl Document {
         image_filename: &str,
         width: Length,
         height: Length,
-        props: rdocx_oxml::drawing::PicProps,
+        props: zavora_docx_oxml::drawing::PicProps,
     ) -> Paragraph<'_> {
         let rel_id = self.embed_image(image_data, image_filename);
         let mut inline = CT_Inline::new(&rel_id, width.to_emu(), height.to_emu());
@@ -890,12 +890,12 @@ impl Document {
             .unwrap_or_else(CT_SectPr::default_letter);
         let page_width_emu = sect
             .page_width
-            .unwrap_or(rdocx_oxml::units::Twips(12240))
+            .unwrap_or(zavora_docx_oxml::units::Twips(12240))
             .to_emu()
             .0;
         let page_height_emu = sect
             .page_height
-            .unwrap_or(rdocx_oxml::units::Twips(15840))
+            .unwrap_or(zavora_docx_oxml::units::Twips(15840))
             .to_emu()
             .0;
 
@@ -968,8 +968,8 @@ impl Document {
             .as_ref()
             .cloned()
             .unwrap_or_else(CT_SectPr::default_letter);
-        let pw = sect.page_width.unwrap_or(rdocx_oxml::units::Twips(12240)).to_emu().0;
-        let ph = sect.page_height.unwrap_or(rdocx_oxml::units::Twips(15840)).to_emu().0;
+        let pw = sect.page_width.unwrap_or(zavora_docx_oxml::units::Twips(12240)).to_emu().0;
+        let ph = sect.page_height.unwrap_or(zavora_docx_oxml::units::Twips(15840)).to_emu().0;
 
         let anchor = CT_Anchor::background(&rel_id, pw, ph);
         let drawing = CT_Drawing::anchor(anchor);
@@ -995,7 +995,7 @@ impl Document {
     /// Public so callers can pre-embed an image and then pass the returned
     /// `rel_id` to [`crate::Cell::add_picture`] for inline cell images.
     pub fn embed_image(&mut self, image_data: &[u8], filename: &str) -> String {
-        use rdocx_opc::relationship::rel_types;
+        use zavora_docx_opc::relationship::rel_types;
 
         // Determine content type from extension
         let ext = filename.rsplit('.').next().unwrap_or("png").to_lowercase();
@@ -1043,7 +1043,7 @@ impl Document {
 
     /// Set the default tab stop width (the spacing of automatic tabs).
     pub fn set_default_tab_stop(&mut self, width: Length) {
-        self.settings.default_tab_stop = Some(rdocx_oxml::units::Twips(width.to_twips()));
+        self.settings.default_tab_stop = Some(zavora_docx_oxml::units::Twips(width.to_twips()));
     }
 
     /// Enable mirror margins (inside/outside margins for double-sided printing).
@@ -1068,7 +1068,7 @@ impl Document {
 
     /// Set the default proofing/theme language (e.g. "en-US", "fr-FR").
     pub fn set_document_language(&mut self, lang: &str) {
-        self.settings.theme_font_lang = Some(rdocx_oxml::settings::ThemeFontLang {
+        self.settings.theme_font_lang = Some(zavora_docx_oxml::settings::ThemeFontLang {
             val: Some(lang.to_string()),
             ..Default::default()
         });
@@ -1079,14 +1079,14 @@ impl Document {
     /// When `verso` differs from `recto`, configures distinct even/odd-page
     /// headers (author on the left page, title on the right).
     pub fn set_running_header(&mut self, verso: &str, recto: &str) {
-        use rdocx_opc::relationship::rel_types;
-        use rdocx_oxml::text::CT_R;
+        use zavora_docx_opc::relationship::rel_types;
+        use zavora_docx_oxml::text::CT_R;
 
         let build = |text: &str| -> Vec<u8> {
             let mut hf = CT_HdrFtr::new();
             let mut p = CT_P::new();
             p.properties = Some(CT_PPr {
-                jc: Some(rdocx_oxml::shared::ST_Jc::Center),
+                jc: Some(zavora_docx_oxml::shared::ST_Jc::Center),
                 ..Default::default()
             });
             let mut r = CT_R::new(text);
@@ -1094,7 +1094,7 @@ impl Document {
                 italic: Some(true),
                 italic_cs: Some(true),
                 small_caps: Some(true),
-                spacing: Some(rdocx_oxml::units::Twips(10)),
+                spacing: Some(zavora_docx_oxml::units::Twips(10)),
                 ..Default::default()
             });
             p.runs.push(r);
@@ -1135,15 +1135,15 @@ impl Document {
 
     /// Set a footer with a centered page number field.
     pub fn set_footer_page_number(&mut self) {
-        use rdocx_opc::relationship::rel_types;
-        use rdocx_oxml::text::{CT_R, RunContent, FieldType};
+        use zavora_docx_opc::relationship::rel_types;
+        use zavora_docx_oxml::text::{CT_R, RunContent, FieldType};
 
         let mut hdr_ftr = CT_HdrFtr::new();
         let mut p = CT_P::new();
 
         // Center alignment
         let mut ppr = CT_PPr::default();
-        ppr.jc = Some(rdocx_oxml::shared::ST_Jc::Center);
+        ppr.jc = Some(zavora_docx_oxml::shared::ST_Jc::Center);
         p.properties = Some(ppr);
 
         // Add a run with PAGE field
@@ -1181,7 +1181,7 @@ impl Document {
     }
 
     fn set_header_footer_part(&mut self, text: &str, is_header: bool, hdr_type: HdrFtrType) {
-        use rdocx_opc::relationship::rel_types;
+        use zavora_docx_opc::relationship::rel_types;
 
         let mut hdr_ftr = CT_HdrFtr::new();
         let mut p = CT_P::new();
@@ -1332,7 +1332,7 @@ impl Document {
         is_header: bool,
         hdr_type: HdrFtrType,
     ) {
-        use rdocx_opc::relationship::rel_types;
+        use zavora_docx_opc::relationship::rel_types;
 
         let type_suffix = match hdr_type {
             HdrFtrType::Default => "",
@@ -1457,7 +1457,7 @@ impl Document {
         is_header: bool,
         hdr_type: HdrFtrType,
     ) {
-        use rdocx_opc::relationship::rel_types;
+        use zavora_docx_opc::relationship::rel_types;
 
         // Determine part name based on type
         let type_suffix = match hdr_type {
@@ -1564,8 +1564,8 @@ impl Document {
         is_header: bool,
         hdr_type: HdrFtrType,
     ) {
-        use rdocx_opc::relationship::rel_types;
-        use rdocx_oxml::properties::CT_Shd;
+        use zavora_docx_opc::relationship::rel_types;
+        use zavora_docx_oxml::properties::CT_Shd;
 
         // Determine part name based on type
         let type_suffix = match hdr_type {
@@ -1726,7 +1726,7 @@ impl Document {
                     .get_abstract_num_for(n.num_id)
                     .map(|a| {
                         a.levels.first().and_then(|l| l.num_fmt)
-                            == Some(rdocx_oxml::numbering::ST_NumberFormat::Bullet)
+                            == Some(zavora_docx_oxml::numbering::ST_NumberFormat::Bullet)
                     })
                     .unwrap_or(false)
             });
@@ -1769,7 +1769,7 @@ impl Document {
                     .get_abstract_num_for(n.num_id)
                     .map(|a| {
                         a.levels.first().and_then(|l| l.num_fmt)
-                            == Some(rdocx_oxml::numbering::ST_NumberFormat::Decimal)
+                            == Some(zavora_docx_oxml::numbering::ST_NumberFormat::Decimal)
                     })
                     .unwrap_or(false)
             });
@@ -1802,7 +1802,7 @@ impl Document {
     /// `format`: "decimal", "upperRoman", "lowerRoman", "upperLetter", "lowerLetter", "bullet".
     /// `bullet_char`: custom bullet character (only used when format is "bullet"), e.g. "→", "★", "◆".
     pub fn add_custom_list_item(&mut self, text: &str, level: u32, format: &str, bullet_char: Option<&str>) -> Paragraph<'_> {
-        use rdocx_oxml::numbering::ST_NumberFormat;
+        use zavora_docx_oxml::numbering::ST_NumberFormat;
         let fmt = match format {
             "upperRoman" => ST_NumberFormat::UpperRoman,
             "lowerRoman" => ST_NumberFormat::LowerRoman,
@@ -1814,8 +1814,8 @@ impl Document {
         let num_id = {
             let numbering = self.ensure_numbering();
             let abs_id = numbering.next_abstract_num_id();
-            let mut abs = rdocx_oxml::numbering::CT_AbstractNum::new(abs_id);
-            let mut lvl = rdocx_oxml::numbering::CT_Lvl::new(0);
+            let mut abs = zavora_docx_oxml::numbering::CT_AbstractNum::new(abs_id);
+            let mut lvl = zavora_docx_oxml::numbering::CT_Lvl::new(0);
             lvl.num_fmt = Some(fmt);
             lvl.start = Some(1);
             lvl.lvl_text = if let Some(ch) = bullet_char {
@@ -1829,18 +1829,18 @@ impl Document {
             abs.levels.push(lvl);
             numbering.abstract_nums.push(abs);
             let nid = numbering.next_num_id();
-            numbering.nums.push(rdocx_oxml::numbering::CT_Num { num_id: nid, abstract_num_id: abs_id, extra_xml: Vec::new() });
+            numbering.nums.push(zavora_docx_oxml::numbering::CT_Num { num_id: nid, abstract_num_id: abs_id, extra_xml: Vec::new() });
             nid
         };
 
-        let mut p = rdocx_oxml::text::CT_P::new();
+        let mut p = zavora_docx_oxml::text::CT_P::new();
         if !text.is_empty() { p.add_run(text); }
-        p.properties = Some(rdocx_oxml::properties::CT_PPr {
+        p.properties = Some(zavora_docx_oxml::properties::CT_PPr {
             num_id: Some(num_id), num_ilvl: Some(level), ..Default::default()
         });
-        self.document.body.content.push(rdocx_oxml::document::BodyContent::Paragraph(p));
+        self.document.body.content.push(zavora_docx_oxml::document::BodyContent::Paragraph(p));
         match self.document.body.content.last_mut().unwrap() {
-            rdocx_oxml::document::BodyContent::Paragraph(p) => crate::paragraph::Paragraph { inner: p },
+            zavora_docx_oxml::document::BodyContent::Paragraph(p) => crate::paragraph::Paragraph { inner: p },
             _ => unreachable!(),
         }
     }
@@ -2029,7 +2029,7 @@ impl Document {
             .get_or_insert_with(CoreProperties::default)
     }
 
-    fn ensure_app_properties(&mut self) -> &mut rdocx_oxml::app_properties::AppProperties {
+    fn ensure_app_properties(&mut self) -> &mut zavora_docx_oxml::app_properties::AppProperties {
         self.app_properties
             .get_or_insert_with(Default::default)
     }
@@ -2070,7 +2070,7 @@ impl Document {
     pub fn add_hyperlink_rel(&mut self, url: &str) -> String {
         self.package
             .get_or_create_part_rels(&self.doc_part_name)
-            .add_external(rdocx_opc::relationship::rel_types::HYPERLINK, url)
+            .add_external(zavora_docx_opc::relationship::rel_types::HYPERLINK, url)
     }
 
     /// Add a comment to the document. Returns the comment ID.
@@ -2156,7 +2156,7 @@ impl Document {
 
         let rel_id = self.package
             .get_or_create_part_rels(&self.doc_part_name)
-            .add(rdocx_opc::relationship::rel_types::HEADER, "header_watermark.xml");
+            .add(zavora_docx_opc::relationship::rel_types::HEADER, "header_watermark.xml");
         self.package.set_part("/word/header_watermark.xml", xml.into_bytes());
         self.package.content_types.add_override(
             "/word/header_watermark.xml",
@@ -2164,7 +2164,7 @@ impl Document {
         );
 
         let sect_pr = self.section_properties_mut();
-        use rdocx_oxml::header_footer::{HdrFtrRef, HdrFtrType};
+        use zavora_docx_oxml::header_footer::{HdrFtrRef, HdrFtrType};
         sect_pr.header_refs.retain(|h| h.hdr_ftr_type != HdrFtrType::Default);
         sect_pr.header_refs.push(HdrFtrRef {
             hdr_ftr_type: HdrFtrType::Default,
@@ -2179,13 +2179,13 @@ impl Document {
             // Ensure relationship exists
             self.package
                 .get_or_create_part_rels(&self.doc_part_name)
-                .add(rdocx_opc::relationship::rel_types::FOOTNOTES, "footnotes.xml");
-            rdocx_oxml::footnotes::CT_Footnotes::new()
+                .add(zavora_docx_opc::relationship::rel_types::FOOTNOTES, "footnotes.xml");
+            zavora_docx_oxml::footnotes::CT_Footnotes::new()
         });
         let id = footnotes.footnotes.iter().map(|f| f.id).max().unwrap_or(0) + 1;
-        let mut para = rdocx_oxml::text::CT_P::new();
+        let mut para = zavora_docx_oxml::text::CT_P::new();
         para.add_run(text);
-        footnotes.footnotes.push(rdocx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
+        footnotes.footnotes.push(zavora_docx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
         id
     }
 
@@ -2194,13 +2194,13 @@ impl Document {
         let endnotes = self.endnotes.get_or_insert_with(|| {
             self.package
                 .get_or_create_part_rels(&self.doc_part_name)
-                .add(rdocx_opc::relationship::rel_types::ENDNOTES, "endnotes.xml");
-            rdocx_oxml::footnotes::CT_Footnotes::new()
+                .add(zavora_docx_opc::relationship::rel_types::ENDNOTES, "endnotes.xml");
+            zavora_docx_oxml::footnotes::CT_Footnotes::new()
         });
         let id = endnotes.footnotes.iter().map(|f| f.id).max().unwrap_or(0) + 1;
-        let mut para = rdocx_oxml::text::CT_P::new();
+        let mut para = zavora_docx_oxml::text::CT_P::new();
         para.add_run(text);
-        endnotes.footnotes.push(rdocx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
+        endnotes.footnotes.push(zavora_docx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
         id
     }
 
@@ -2365,7 +2365,7 @@ impl Document {
 
         let numbering = self
             .numbering
-            .get_or_insert_with(|| rdocx_oxml::numbering::CT_Numbering {
+            .get_or_insert_with(|| zavora_docx_oxml::numbering::CT_Numbering {
                 abstract_nums: Vec::new(),
                 nums: Vec::new(),
                 extra_xml: Vec::new(),
@@ -2433,13 +2433,13 @@ impl Document {
             for cell in &mut row.cells {
                 for cc in &mut cell.content {
                     match cc {
-                        rdocx_oxml::table::CellContent::Paragraph(p) => {
+                        zavora_docx_oxml::table::CellContent::Paragraph(p) => {
                             Self::remap_paragraph_num_id(p, offset);
                         }
-                        rdocx_oxml::table::CellContent::Table(nested) => {
+                        zavora_docx_oxml::table::CellContent::Table(nested) => {
                             Self::remap_table_num_ids(nested, offset);
                         }
-                        rdocx_oxml::table::CellContent::RawXml(_) => {}
+                        zavora_docx_oxml::table::CellContent::RawXml(_) => {}
                     }
                 }
             }
@@ -2458,9 +2458,9 @@ impl Document {
     /// * `index` - Body content index at which to insert the TOC
     /// * `max_level` - Maximum heading level to include (1-9, typically 3)
     pub fn insert_toc(&mut self, index: usize, max_level: u32) -> usize {
-        use rdocx_oxml::borders::{CT_TabStop, CT_Tabs};
-        use rdocx_oxml::shared::{ST_TabJc, ST_TabLeader};
-        use rdocx_oxml::units::Twips;
+        use zavora_docx_oxml::borders::{CT_TabStop, CT_Tabs};
+        use zavora_docx_oxml::shared::{ST_TabJc, ST_TabLeader};
+        use zavora_docx_oxml::units::Twips;
 
         let max_level = max_level.clamp(1, 9);
 
@@ -2548,7 +2548,7 @@ impl Document {
         title_p.runs.push(title_r);
         title_p.properties = Some(CT_PPr {
             style_id: Some("Title".to_string()),
-            jc: Some(rdocx_oxml::shared::ST_Jc::Center),
+            jc: Some(zavora_docx_oxml::shared::ST_Jc::Center),
             space_after: Some(Twips(240)),
             ..Default::default()
         });
@@ -2632,7 +2632,7 @@ impl Document {
     /// Handles placeholders split across multiple runs. Returns the total number
     /// of replacements made.
     pub fn replace_text(&mut self, placeholder: &str, replacement: &str) -> usize {
-        use rdocx_oxml::placeholder;
+        use zavora_docx_oxml::placeholder;
 
         let mut count = 0;
 
@@ -2725,7 +2725,7 @@ impl Document {
 
     /// Internal: replace using a pre-compiled regex.
     fn replace_regex_compiled(&mut self, re: &regex::Regex, replacement: &str) -> usize {
-        use rdocx_oxml::placeholder;
+        use zavora_docx_oxml::placeholder;
 
         let mut count = 0;
 
@@ -2791,7 +2791,7 @@ impl Document {
     ///
     /// This is called after the typed-model replacement and flush_to_package.
     fn replace_in_xml_parts(&mut self, placeholder: &str, replacement: &str) -> usize {
-        use rdocx_oxml::placeholder::{replace_in_chart_xml, replace_in_xml_part};
+        use zavora_docx_oxml::placeholder::{replace_in_chart_xml, replace_in_xml_part};
 
         let mut count = 0;
 
@@ -2895,13 +2895,13 @@ impl Document {
     pub fn to_pdf_with_fonts(&self, font_files: &[(&str, &[u8])]) -> Result<Vec<u8>> {
         let mut input = self.build_layout_input();
         for (family, data) in font_files {
-            input.fonts.push(rdocx_layout::FontFile {
+            input.fonts.push(zavora_docx_layout::FontFile {
                 family: family.to_string(),
                 data: data.to_vec(),
             });
         }
-        let layout = rdocx_layout::layout_document(&input)?;
-        Ok(rdocx_pdf::render_to_pdf(&layout))
+        let layout = zavora_docx_layout::layout_document(&input)?;
+        Ok(zavora_docx_pdf::render_to_pdf(&layout))
     }
 
     /// Save the document as a PDF file.
@@ -2914,19 +2914,19 @@ impl Document {
     /// Convert the document to a complete HTML document string.
     pub fn to_html(&self) -> String {
         let input = self.build_html_input();
-        rdocx_html::to_html_document(&input, &rdocx_html::HtmlOptions::default())
+        zavora_docx_html::to_html_document(&input, &zavora_docx_html::HtmlOptions::default())
     }
 
     /// Convert the document to an HTML fragment (body content only, no `<html>` wrapper).
     pub fn to_html_fragment(&self) -> String {
         let input = self.build_html_input();
-        rdocx_html::to_html_fragment(&input, &rdocx_html::HtmlOptions::default())
+        zavora_docx_html::to_html_fragment(&input, &zavora_docx_html::HtmlOptions::default())
     }
 
     /// Convert the document to Markdown.
     pub fn to_markdown(&self) -> String {
         let input = self.build_html_input();
-        rdocx_html::to_markdown(&input)
+        zavora_docx_html::to_markdown(&input)
     }
 
     /// Extract all text in document order, including table cell text (each cell
@@ -2954,11 +2954,11 @@ impl Document {
     }
 
     /// Build an HtmlInput from the document's current state.
-    fn build_html_input(&self) -> rdocx_html::HtmlInput {
-        use rdocx_opc::relationship::rel_types;
+    fn build_html_input(&self) -> zavora_docx_html::HtmlInput {
+        use zavora_docx_opc::relationship::rel_types;
         use std::collections::HashMap;
 
-        let mut images: HashMap<String, rdocx_html::ImageData> = HashMap::new();
+        let mut images: HashMap<String, zavora_docx_html::ImageData> = HashMap::new();
         let mut hyperlink_urls: HashMap<String, String> = HashMap::new();
 
         if let Some(rels) = self.package.get_part_rels(&self.doc_part_name) {
@@ -2971,7 +2971,7 @@ impl Document {
                             let content_type = guess_image_content_type(&part_name);
                             images.insert(
                                 rel.id.clone(),
-                                rdocx_html::ImageData {
+                                zavora_docx_html::ImageData {
                                     data: data.to_vec(),
                                     content_type,
                                 },
@@ -2988,7 +2988,7 @@ impl Document {
             }
         }
 
-        rdocx_html::HtmlInput {
+        zavora_docx_html::HtmlInput {
             document: self.document.clone(),
             styles: self.styles.clone(),
             numbering: self.numbering.clone(),
@@ -3004,21 +3004,21 @@ impl Document {
     /// * `dpi` - Resolution (72 = 1:1, 150 = standard, 300 = high quality)
     pub fn render_page_to_png(&self, page_index: usize, dpi: f64) -> Result<Option<Vec<u8>>> {
         let input = self.build_layout_input();
-        let layout = rdocx_layout::layout_document(&input)?;
-        Ok(rdocx_pdf::render_page_to_png(&layout, page_index, dpi))
+        let layout = zavora_docx_layout::layout_document(&input)?;
+        Ok(zavora_docx_pdf::render_page_to_png(&layout, page_index, dpi))
     }
 
     /// Render all pages of the document to PNG bytes.
     pub fn render_all_pages(&self, dpi: f64) -> Result<Vec<Vec<u8>>> {
         let input = self.build_layout_input();
-        let layout = rdocx_layout::layout_document(&input)?;
-        Ok(rdocx_pdf::render_all_pages(&layout, dpi))
+        let layout = zavora_docx_layout::layout_document(&input)?;
+        Ok(zavora_docx_pdf::render_all_pages(&layout, dpi))
     }
 
     /// Build a LayoutInput from the document's current state.
-    fn build_layout_input(&self) -> rdocx_layout::LayoutInput {
-        use rdocx_layout::{ImageData, LayoutInput};
-        use rdocx_opc::relationship::rel_types;
+    fn build_layout_input(&self) -> zavora_docx_layout::LayoutInput {
+        use zavora_docx_layout::{ImageData, LayoutInput};
+        use zavora_docx_opc::relationship::rel_types;
         use std::collections::HashMap;
 
         let mut headers: HashMap<String, CT_HdrFtr> = HashMap::new();
@@ -3075,14 +3075,14 @@ impl Document {
                         let part_name =
                             OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
                         if let Some(xml) = self.package.get_part(&part_name) {
-                            footnotes = rdocx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
+                            footnotes = zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
                         }
                     }
                     t if t == rel_types::ENDNOTES => {
                         let part_name =
                             OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
                         if let Some(xml) = self.package.get_part(&part_name) {
-                            endnotes = rdocx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
+                            endnotes = zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
                         }
                     }
                     _ => {}
@@ -3094,7 +3094,7 @@ impl Document {
         let theme = self
             .package
             .get_part("/word/theme/theme1.xml")
-            .and_then(|data| rdocx_oxml::theme::Theme::from_xml(data).ok());
+            .and_then(|data| zavora_docx_oxml::theme::Theme::from_xml(data).ok());
 
         LayoutInput {
             document: self.document.clone(),
@@ -3117,7 +3117,7 @@ impl Document {
     /// Word can embed fonts as `.odttf` (obfuscated TrueType) or regular `.ttf`/`.otf`
     /// files in the `word/fonts/` directory. ODTTF files have the first 32 bytes
     /// XOR'd with a 16-byte GUID derived from the font's relationship ID.
-    fn extract_embedded_fonts(&self) -> Vec<rdocx_layout::FontFile> {
+    fn extract_embedded_fonts(&self) -> Vec<zavora_docx_layout::FontFile> {
         let mut fonts = Vec::new();
 
         // Look for font parts in word/fonts/ directory
@@ -3134,14 +3134,14 @@ impl Document {
             if lower.ends_with(".odttf") {
                 // Deobfuscate ODTTF: XOR first 32 bytes with GUID from the file name
                 if let Some(deobfuscated) = deobfuscate_odttf(data, file_name) {
-                    fonts.push(rdocx_layout::FontFile {
+                    fonts.push(zavora_docx_layout::FontFile {
                         family,
                         data: deobfuscated,
                     });
                 }
             } else if lower.ends_with(".ttf") || lower.ends_with(".otf") || lower.ends_with(".ttc")
             {
-                fonts.push(rdocx_layout::FontFile {
+                fonts.push(zavora_docx_layout::FontFile {
                     family,
                     data: data.clone(),
                 });
@@ -3155,7 +3155,7 @@ impl Document {
     ///
     /// This is useful for CLI tools that accept a `--font-dir` argument.
     /// Supports `.ttf`, `.otf`, and `.ttc` files.
-    pub fn load_fonts_from_dir<P: AsRef<Path>>(dir: P) -> Vec<rdocx_layout::FontFile> {
+    pub fn load_fonts_from_dir<P: AsRef<Path>>(dir: P) -> Vec<zavora_docx_layout::FontFile> {
         let mut fonts = Vec::new();
         let dir = dir.as_ref();
         if let Ok(entries) = std::fs::read_dir(dir) {
@@ -3174,7 +3174,7 @@ impl Document {
                         .and_then(|s| s.to_str())
                         .unwrap_or("Unknown")
                         .to_string();
-                    fonts.push(rdocx_layout::FontFile { family, data });
+                    fonts.push(zavora_docx_layout::FontFile { family, data });
                 }
             }
         }
@@ -3273,19 +3273,19 @@ impl Document {
                     for cell in &row.cells {
                         for cc in &cell.content {
                             match cc {
-                                rdocx_oxml::table::CellContent::Paragraph(p) => {
+                                zavora_docx_oxml::table::CellContent::Paragraph(p) => {
                                     Self::collect_images_from_content(
                                         &BodyContent::Paragraph(p.clone()),
                                         result,
                                     );
                                 }
-                                rdocx_oxml::table::CellContent::Table(nested) => {
+                                zavora_docx_oxml::table::CellContent::Table(nested) => {
                                     Self::collect_images_from_content(
                                         &BodyContent::Table(nested.clone()),
                                         result,
                                     );
                                 }
-                                rdocx_oxml::table::CellContent::RawXml(_) => {}
+                                zavora_docx_oxml::table::CellContent::RawXml(_) => {}
                             }
                         }
                     }
@@ -3299,7 +3299,7 @@ impl Document {
     ///
     /// Resolves hyperlink relationship IDs to their target URLs where possible.
     pub fn links(&self) -> Vec<LinkInfo> {
-        use rdocx_opc::relationship::rel_types;
+        use zavora_docx_opc::relationship::rel_types;
 
         // Build a map of hyperlink rel_id -> target URL
         let mut url_map = std::collections::HashMap::new();
@@ -3358,15 +3358,15 @@ impl Document {
                     for cell in &row.cells {
                         for cc in &cell.content {
                             match cc {
-                                rdocx_oxml::table::CellContent::Paragraph(p) => {
+                                zavora_docx_oxml::table::CellContent::Paragraph(p) => {
                                     count += p.text().split_whitespace().count();
                                 }
-                                rdocx_oxml::table::CellContent::Table(nested) => {
+                                zavora_docx_oxml::table::CellContent::Table(nested) => {
                                     count += Self::word_count_in_content(&BodyContent::Table(
                                         nested.clone(),
                                     ));
                                 }
-                                rdocx_oxml::table::CellContent::RawXml(_) => {}
+                                zavora_docx_oxml::table::CellContent::RawXml(_) => {}
                             }
                         }
                     }
@@ -3684,7 +3684,7 @@ fn deobfuscate_odttf(data: &[u8], file_name: &str) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::paragraph::Alignment;
-    use rdocx_oxml::units::{HalfPoint, Twips};
+    use zavora_docx_oxml::units::{HalfPoint, Twips};
 
     #[test]
     fn create_new_document() {

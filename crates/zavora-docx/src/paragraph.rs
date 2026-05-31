@@ -1,13 +1,13 @@
 //! Paragraph — a block-level container for runs of text.
 
-use rdocx_oxml::borders::{CT_BorderEdge, CT_PBdr, CT_TabStop, CT_Tabs};
-use rdocx_oxml::document::CT_SectPr;
-use rdocx_oxml::properties::{CT_PPr, CT_Shd};
-use rdocx_oxml::shared::{
+use zavora_docx_oxml::borders::{CT_BorderEdge, CT_PBdr, CT_TabStop, CT_Tabs};
+use zavora_docx_oxml::document::CT_SectPr;
+use zavora_docx_oxml::properties::{CT_PPr, CT_Shd};
+use zavora_docx_oxml::shared::{
     ST_Border, ST_Jc, ST_PageOrientation, ST_SectionType, ST_TabJc, ST_TabLeader,
 };
-use rdocx_oxml::text::{CT_P, CT_R};
-use rdocx_oxml::units::Twips;
+use zavora_docx_oxml::text::{CT_P, CT_R};
+use zavora_docx_oxml::units::Twips;
 
 use crate::Length;
 use crate::run::{Run, RunRef};
@@ -155,7 +155,7 @@ impl<'a> Paragraph<'a> {
     /// Add a tab character (a real `<w:tab/>`) that advances to the next tab
     /// stop. Use with `add_tab_stop` to right-align trailing text (e.g. dates).
     pub fn add_tab(&mut self) -> &mut Self {
-        use rdocx_oxml::text::RunContent;
+        use zavora_docx_oxml::text::RunContent;
         let mut r = CT_R::new("");
         r.content = vec![RunContent::Tab];
         self.inner.runs.push(r);
@@ -168,7 +168,7 @@ impl<'a> Paragraph<'a> {
         let run_start = self.inner.runs.len();
         self.inner.runs.push(CT_R::new(text));
         let run_end = self.inner.runs.len();
-        self.inner.hyperlinks.push(rdocx_oxml::text::HyperlinkSpan {
+        self.inner.hyperlinks.push(zavora_docx_oxml::text::HyperlinkSpan {
             rel_id: rel_id.map(|s| s.to_string()),
             anchor: anchor.map(|s| s.to_string()),
             run_start,
@@ -190,7 +190,7 @@ impl<'a> Paragraph<'a> {
     }
 
     pub fn bookmark(&mut self, id: u32, name: &str) {
-        let bm = rdocx_oxml::bookmark::CT_Bookmark::new(id, name);
+        let bm = zavora_docx_oxml::bookmark::CT_Bookmark::new(id, name);
         // bookmarkStart before all runs, bookmarkEnd after all runs
         self.inner.extra_xml.push((0, bm.start_xml()));
         let pos = self.inner.runs.len();
@@ -200,7 +200,7 @@ impl<'a> Paragraph<'a> {
     /// Insert a cross-reference (`REF` field) to a bookmark by name, showing
     /// the referenced text and updating on field refresh.
     pub fn cross_reference(&mut self, name: &str) {
-        let bm = rdocx_oxml::bookmark::CT_Bookmark::new(0, name);
+        let bm = zavora_docx_oxml::bookmark::CT_Bookmark::new(0, name);
         self.inner.extra_xml.push((self.inner.runs.len(), bm.cross_reference_xml()));
     }
 
