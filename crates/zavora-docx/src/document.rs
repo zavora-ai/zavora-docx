@@ -3096,6 +3096,56 @@ impl Document {
         )
     }
 
+    /// Page geometry (CSS pixels @96dpi) + rendered header/footer HTML, for a
+    /// paginated edit view. The body is rendered separately via
+    /// `to_editable_html` and laid into the page boxes by the client.
+    pub fn page_layout(&self) -> PageLayout {
+        // twips → px @96dpi: px = twips / 1440 * 96 = twips / 15.
+        let tw_px = |t: Option<zavora_docx_oxml::units::Twips>, default: i32| -> f64 {
+            (t.map(|v| v.0).unwrap_or(default) as f64) / 15.0
+        };
+        let s = self.document.body.sect_pr.as_ref();
+        let layout = PageLayout {
+            page_width: tw_px(s.and_then(|s| s.page_width), 12240),
+            page_height: tw_px(s.and_then(|s| s.page_height), 15840),
+            margin_top: tw_px(s.and_then(|s| s.margin_top), 1440),
+            margin_right: tw_px(s.and_then(|s| s.margin_right), 1440),
+            margin_bottom: tw_px(s.and_then(|s| s.margin_bottom), 1440),
+            margin_left: tw_px(s.and_then(|s| s.margin_left), 1440),
+            header_html: self.hdrftr_html(zavora_docx_opc::relationship::rel_types::HEADER),
+            footer_html: self.hdrftr_html(zavora_docx_opc::relationship::rel_types::FOOTER),
+        };
+        layout
+    }
+
+    /// Render the (default) header or footer part to an HTML fragment, or "" if none.
+    fn hdrftr_html(&self, rel_type: &str) -> String {
+        let Some(rels) = self.package.get_part_rels(&self.doc_part_name) else { return String::new() };
+        for rel in &rels.items {
+            if rel.rel_type == rel_type {
+                let part = OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
+                if let Some(xml) = self.package.get_part(&part)
+                    && let Ok(hf) = CT_HdrFtr::from_xml(xml)
+                {
+                    let mut body = zavora_docx_oxml::document::CT_Body::new();
+                    for p in hf.paragraphs {
+                        body.content.push(zavora_docx_oxml::document::BodyContent::Paragraph(p));
+                    }
+                    let doc = CT_Document { body, ..Default::default() };
+                    let input = zavora_docx_html::HtmlInput {
+                        document: doc,
+                        styles: self.styles.clone(),
+                        numbering: None,
+                        images: std::collections::HashMap::new(),
+                        hyperlink_urls: std::collections::HashMap::new(),
+                    };
+                    return zavora_docx_html::to_html_fragment(&input, &zavora_docx_html::HtmlOptions::default());
+                }
+            }
+        }
+        String::new()
+    }
+
     /// Convert the document to Markdown.
     pub fn to_markdown(&self) -> String {
         let input = self.build_html_input();
@@ -3711,6 +3761,19 @@ fn guess_image_content_type(part_name: &str) -> String {
 
 /// A positioned run of text for building an interactive edit/select overlay
 /// on a rendered page. All coordinates are in pixels at the requested DPI,
+/// Page geometry (CSS pixels @96dpi) + header/footer HTML for the paginated edit view.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PageLayout {
+    pub page_width: f64,
+    pub page_height: f64,
+    pub margin_top: f64,
+    pub margin_right: f64,
+    pub margin_bottom: f64,
+    pub margin_left: f64,
+    pub header_html: String,
+    pub footer_html: String,
+}
+
 /// origin at the page top-left. See [`Document::text_boxes`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextBox {
