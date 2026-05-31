@@ -1,14 +1,14 @@
 //! Output types for the layout engine: positioned page frames, glyph runs, etc.
 
 /// A point in 2D space (in typographic points from the top-left corner).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
 }
 
 /// An axis-aligned rectangle.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct Rect {
     pub x: f64,
     pub y: f64,
@@ -17,7 +17,7 @@ pub struct Rect {
 }
 
 /// An RGBA color with components in [0.0, 1.0].
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct Color {
     pub r: f64,
     pub g: f64,
@@ -54,11 +54,11 @@ impl Color {
 }
 
 /// Opaque font identifier assigned by FontManager.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 pub struct FontId(pub u32);
 
 /// Kind of field for post-pagination substitution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum FieldKind {
     /// Current page number.
     Page,
@@ -67,7 +67,7 @@ pub enum FieldKind {
 }
 
 /// A positioned run of shaped glyphs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct GlyphRun {
     /// Baseline origin of the first glyph (in points).
     pub origin: Point,
@@ -94,7 +94,7 @@ pub struct GlyphRun {
 }
 
 /// A positioned element on a page.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum PositionedElement {
     /// A run of shaped text glyphs.
     Text(GlyphRun),
@@ -112,6 +112,7 @@ pub enum PositionedElement {
     /// An inline image.
     Image {
         rect: Rect,
+        #[serde(skip)]
         data: Vec<u8>,
         content_type: String,
         /// Embed relationship ID (used to resolve image data post-pagination).
@@ -122,7 +123,7 @@ pub enum PositionedElement {
 }
 
 /// A single page of laid-out content.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct PageFrame {
     /// 1-based page number.
     pub page_number: usize,

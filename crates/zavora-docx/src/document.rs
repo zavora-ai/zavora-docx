@@ -3029,6 +3029,18 @@ impl Document {
 
     // ---- PDF conversion ----
 
+    /// Lay out the document and return the positioned page frames as JSON.
+    ///
+    /// This runs the SAME layout engine that drives PDF export, so the browser
+    /// can render exactly what the PDF will contain (true WYSIWYG). Raw font and
+    /// image bytes are omitted — the client resolves those by id via dedicated
+    /// endpoints.
+    pub fn layout_json(&self) -> Result<String> {
+        let input = self.build_layout_input();
+        let layout = zavora_docx_layout::layout_document(&input)?;
+        Ok(serde_json::to_string(&layout.pages)?)
+    }
+
     /// Render the document to PDF bytes.
     ///
     /// This performs a full layout pass (font shaping, line breaking, pagination)

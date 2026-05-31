@@ -16,6 +16,9 @@ pub enum Error {
     #[error("layout error: {0}")]
     Layout(#[from] zavora_docx_layout::LayoutError),
 
+    #[error("JSON serialization error: {0}")]
+    Json(#[from] serde_json::Error),
+
     #[error("document has no main document part")]
     NoDocumentPart,
 
