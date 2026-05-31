@@ -190,7 +190,7 @@ Most DOCX solutions shell out to LibreOffice or wrap C/C++/Java libraries. zavor
 | DOCX to PDF | Yes (built-in) | No | Via MS Word | Via Pandoc + LaTeX |
 | DOCX to HTML | Yes (built-in) | No | No | Yes (lossy) |
 | DOCX to Markdown | Yes (built-in) | No | No | Yes (lossy) |
-| Math / charts / shapes | Yes | Limited | -- | -- |
+| Math / charts / shapes | Yes | No | -- | -- |
 | Layout engine | Yes | None | Delegates to Word | Delegates to LaTeX |
 | External runtime | **None** | None (but no PDF) | **MS Word required** | **Pandoc + LaTeX** |
 | Install size | **~4 MB binary** | ~5 MB | ~31 KB + Word | 300-650 MB |
@@ -198,6 +198,23 @@ Most DOCX solutions shell out to LibreOffice or wrap C/C++/Java libraries. zavor
 | WASM / browser | Yes | No | No | No |
 
 **python-docx** is the most popular DOCX library in any language (~14M downloads/month), but it has **zero conversion capabilities** — no PDF, no HTML, no Markdown. Users who need PDF must bolt on LibreOffice (~500 MB) or a commercial API. zavora-docx gives you the same read/write API *plus* built-in conversion in a single ~4 MB binary.
+
+#### API parity with python-docx
+
+zavora-docx now matches python-docx's full read/write API surface — including the corners python-docx is known for — and adds capabilities it has no equivalent for.
+
+| python-docx feature | zavora-docx equivalent |
+|---|---|
+| `run.add_break(WD_BREAK.*)` | `Run::add_break(BreakKind::{Line,Page,Column})` |
+| `run.add_picture(...)` | `Run::add_picture(rel_id, w, h)` (inline, in-run) |
+| `document.core_properties.*` (all fields) | full `CoreProperties` + `set_category/content_status/identifier/language/revision/version/last_printed` |
+| `document.sections[]` | `Document::sections()` / `section_count()` |
+| `document.styles` collection + `style.base_style` | `style()/style_by_name()/styles_of_type()/default_style()` + `style_base_chain()` inheritance traversal |
+| paragraph/run/table formatting | full parity (alignment, indents, spacing, borders, shading, fonts, colors, …) |
+
+Beyond parity, zavora-docx authors constructs python-docx cannot — math/OMML, charts, shapes, content controls, footnotes/endnotes, comments + threaded replies, bookmarks, fields, watermarks, document protection, font embedding, building blocks, custom XML — and renders to PDF/HTML/Markdown/PNG, none of which python-docx offers.
+
+The remaining difference is **ecosystem maturity**, not capability: python-docx has years of documentation, examples, and ~14M downloads/month. zavora-docx is the broader library; python-docx is the more widely known one.
 
 ### vs. Java Libraries
 
