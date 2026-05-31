@@ -1313,6 +1313,7 @@ dependencies = [
  "zavora-docx-opc",
  "zavora-docx-oxml",
  "zavora-docx-pdf",
+ "zip",
 ]
 
 [[package]]

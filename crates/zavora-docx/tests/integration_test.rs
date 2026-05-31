@@ -1494,3 +1494,72 @@ fn save_pdf_to_file() {
         std::fs::remove_file(path).ok();
     }
 }
+
+#[test]
+fn parity_run_add_break() {
+    use zavora_docx::BreakKind;
+    let mut doc = Document::new();
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("before");
+        p.add_run("").add_break(BreakKind::Page);
+        p.add_run("after");
+    }
+    let xml = part(&doc.to_bytes().expect("serialize"), "word/document.xml");
+    assert!(xml.contains("w:type=\"page\""), "page break missing");
+}
+
+#[test]
+fn parity_run_add_picture() {
+    let mut doc = Document::new();
+    let png: &[u8] = &[
+        0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0x00,0x00,0x00,0x0D,0x49,0x48,0x44,0x52,
+        0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x01,0x08,0x06,0x00,0x00,0x00,0x1F,0x15,0xC4,
+        0x89,0x00,0x00,0x00,0x0A,0x49,0x44,0x41,0x54,0x78,0x9C,0x63,0x00,0x01,0x00,0x00,
+        0x05,0x00,0x01,0x0D,0x0A,0x2D,0xB4,0x00,0x00,0x00,0x00,0x49,0x45,0x4E,0x44,0xAE,
+        0x42,0x60,0x82,
+    ];
+    let rel_id = doc.embed_image(png, "pic.png");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("see: ");
+        p.add_run("").add_picture(&rel_id, zavora_docx::Length::inches(1.0), zavora_docx::Length::inches(1.0));
+    }
+    let xml = part(&doc.to_bytes().expect("serialize"), "word/document.xml");
+    assert!(xml.contains("<w:drawing") || xml.contains("<wp:inline"), "inline drawing missing: {xml}");
+}
+
+#[test]
+fn parity_core_properties_full() {
+    let mut doc = Document::new();
+    doc.set_category("Report");
+    doc.set_content_status("Final");
+    doc.set_identifier("DOC-9");
+    doc.set_language("en-US");
+    doc.set_revision("4");
+    doc.set_version("2.0");
+    let xml = part(&doc.to_bytes().expect("serialize"), "docProps/core.xml");
+    for needle in ["cp:category", "cp:contentStatus", "dc:identifier", "dc:language", "cp:revision", "cp:version"] {
+        assert!(xml.contains(needle), "missing {needle}: {xml}");
+    }
+}
+
+#[test]
+fn parity_sections_collection() {
+    use zavora_docx::SectionBreak;
+    let mut doc = Document::new();
+    doc.add_paragraph("section one").section_break(SectionBreak::NextPage);
+    doc.add_paragraph("section two");
+    assert!(doc.section_count() >= 2, "expected >=2 sections, got {}", doc.section_count());
+    assert_eq!(doc.sections().len(), doc.section_count());
+}
+
+/// Extract a single part's text from a .docx (zip) byte buffer.
+fn part(bytes: &[u8], name: &str) -> String {
+    use std::io::Read;
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).expect("zip");
+    let mut f = zip.by_name(name).unwrap_or_else(|_| panic!("missing {name}"));
+    let mut s = String::new();
+    f.read_to_string(&mut s).expect("utf8");
+    s
+}

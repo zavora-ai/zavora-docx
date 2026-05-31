@@ -35,13 +35,34 @@ impl UnderlineStyle {
     }
 }
 
+/// A break inserted within a run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BreakKind {
+    /// Soft line break (`<w:br/>`).
+    Line,
+    /// Page break.
+    Page,
+    /// Column break.
+    Column,
+}
+
+impl BreakKind {
+    fn to_oxml(self) -> zavora_docx_oxml::text::BreakType {
+        use zavora_docx_oxml::text::BreakType;
+        match self {
+            Self::Line => BreakType::Line,
+            Self::Page => BreakType::Page,
+            Self::Column => BreakType::Column,
+        }
+    }
+}
+
 /// A run of text within a paragraph.
 ///
 /// All text in a run shares the same formatting (font, size, bold, etc.).
 pub struct Run<'a> {
     pub(crate) inner: &'a mut CT_R,
 }
-
 impl<'a> Run<'a> {
     /// Get the text content of this run.
     pub fn text(&self) -> String {
@@ -58,6 +79,23 @@ impl<'a> Run<'a> {
         self.inner
             .content
             .push(RunContent::Text(CT_Text::new(text)));
+    }
+
+    /// Insert a break into the run. `kind` selects line (soft return), page,
+    /// or column break — mirrors python-docx `run.add_break(WD_BREAK.*)`.
+    pub fn add_break(&mut self, kind: BreakKind) {
+        self.inner.content.push(RunContent::Break(kind.to_oxml()));
+    }
+
+    /// Insert an inline picture into this run — mirrors python-docx
+    /// `run.add_picture()`. Obtain `rel_id` from [`crate::Document::embed_image`]
+    /// first, then pass it here with the display dimensions.
+    pub fn add_picture(&mut self, rel_id: &str, width: Length, height: Length) {
+        use zavora_docx_oxml::drawing::{CT_Drawing, CT_Inline};
+        let inline = CT_Inline::new(rel_id, width.to_emu(), height.to_emu());
+        self.inner
+            .content
+            .push(RunContent::Drawing(CT_Drawing::inline(inline)));
     }
 
     /// Set bold formatting.

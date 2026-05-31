@@ -24,6 +24,20 @@ pub struct CoreProperties {
     pub created: Option<String>,
     /// Date modified (`dcterms:modified`).
     pub modified: Option<String>,
+    /// Category (`cp:category`).
+    pub category: Option<String>,
+    /// Content status (`cp:contentStatus`).
+    pub content_status: Option<String>,
+    /// Identifier (`dc:identifier`).
+    pub identifier: Option<String>,
+    /// Language (`dc:language`).
+    pub language: Option<String>,
+    /// Revision number (`cp:revision`).
+    pub revision: Option<String>,
+    /// Version (`cp:version`).
+    pub version: Option<String>,
+    /// Date last printed (`cp:lastPrinted`).
+    pub last_printed: Option<String>,
 }
 
 impl CoreProperties {
@@ -43,7 +57,9 @@ impl CoreProperties {
                     let local = local_name(name.as_ref());
                     match local {
                         "title" | "creator" | "subject" | "description" | "keywords"
-                        | "lastModifiedBy" | "created" | "modified" => {
+                        | "lastModifiedBy" | "created" | "modified" | "category"
+                        | "contentStatus" | "identifier" | "language" | "revision"
+                        | "version" | "lastPrinted" => {
                             current_tag = Some(local.to_string());
                         }
                         _ => {
@@ -64,6 +80,13 @@ impl CoreProperties {
                                 "lastModifiedBy" => props.last_modified_by = Some(text),
                                 "created" => props.created = Some(text),
                                 "modified" => props.modified = Some(text),
+                                "category" => props.category = Some(text),
+                                "contentStatus" => props.content_status = Some(text),
+                                "identifier" => props.identifier = Some(text),
+                                "language" => props.language = Some(text),
+                                "revision" => props.revision = Some(text),
+                                "version" => props.version = Some(text),
+                                "lastPrinted" => props.last_printed = Some(text),
                                 _ => {}
                             }
                         }
@@ -140,8 +163,15 @@ impl CoreProperties {
         write_element(&mut writer, "cp:keywords", &self.keywords)?;
         write_element(&mut writer, "dc:description", &self.description)?;
         write_element(&mut writer, "cp:lastModifiedBy", &self.last_modified_by)?;
+        write_element(&mut writer, "cp:revision", &self.revision)?;
+        write_element(&mut writer, "cp:category", &self.category)?;
+        write_element(&mut writer, "cp:contentStatus", &self.content_status)?;
+        write_element(&mut writer, "cp:version", &self.version)?;
+        write_element(&mut writer, "dc:identifier", &self.identifier)?;
+        write_element(&mut writer, "dc:language", &self.language)?;
         write_date_element(&mut writer, "dcterms:created", &self.created)?;
         write_date_element(&mut writer, "dcterms:modified", &self.modified)?;
+        write_date_element(&mut writer, "cp:lastPrinted", &self.last_printed)?;
 
         writer.write_event(Event::End(BytesEnd::new("cp:coreProperties")))?;
 
@@ -202,6 +232,13 @@ mod tests {
             last_modified_by: None,
             created: Some("2024-01-01T00:00:00Z".to_string()),
             modified: Some("2024-06-01T00:00:00Z".to_string()),
+            category: Some("Report".to_string()),
+            content_status: Some("Final".to_string()),
+            identifier: Some("DOC-001".to_string()),
+            language: Some("en-US".to_string()),
+            revision: Some("3".to_string()),
+            version: Some("1.2".to_string()),
+            last_printed: Some("2024-05-01T00:00:00Z".to_string()),
         };
 
         let xml = props.to_xml().unwrap();
@@ -212,5 +249,12 @@ mod tests {
         assert_eq!(parsed.keywords, props.keywords);
         assert_eq!(parsed.created, props.created);
         assert_eq!(parsed.modified, props.modified);
+        assert_eq!(parsed.category, props.category);
+        assert_eq!(parsed.content_status, props.content_status);
+        assert_eq!(parsed.identifier, props.identifier);
+        assert_eq!(parsed.language, props.language);
+        assert_eq!(parsed.revision, props.revision);
+        assert_eq!(parsed.version, props.version);
+        assert_eq!(parsed.last_printed, props.last_printed);
     }
 }

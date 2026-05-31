@@ -40,6 +40,6 @@ pub use zavora_docx_oxml::sdt::SdtKind;
 pub use paragraph::{
     Alignment, BorderStyle, Paragraph, ParagraphRef, SectionBreak, TabAlignment, TabLeader,
 };
-pub use run::{Run, RunRef, UnderlineStyle};
+pub use run::{BreakKind, Run, RunRef, UnderlineStyle};
 pub use style::{Style, StyleBuilder};
 pub use table::{Cell, CellRef, Row, RowRef, Table, TableRef, VerticalAlignment};

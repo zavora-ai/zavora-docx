@@ -1903,6 +1903,29 @@ impl Document {
         self.document.body.sect_pr.as_ref()
     }
 
+    /// All sections in document order — mirrors python-docx `doc.sections`.
+    ///
+    /// Non-final sections store their `sectPr` inside the last paragraph of the
+    /// section (`pPr/sectPr`); the final section's `sectPr` lives on the body.
+    /// This returns the paragraph-embedded ones first, then the body section.
+    pub fn sections(&self) -> Vec<&CT_SectPr> {
+        let mut out: Vec<&CT_SectPr> = self
+            .document
+            .body
+            .paragraphs()
+            .filter_map(|p| p.properties.as_ref().and_then(|ppr| ppr.sect_pr.as_ref()))
+            .collect();
+        if let Some(body) = self.document.body.sect_pr.as_ref() {
+            out.push(body);
+        }
+        out
+    }
+
+    /// Number of sections in the document.
+    pub fn section_count(&self) -> usize {
+        self.sections().len()
+    }
+
     /// Get a mutable reference to section properties, creating defaults if needed.
     pub fn section_properties_mut(&mut self) -> &mut CT_SectPr {
         self.document
@@ -2022,6 +2045,41 @@ impl Document {
     /// Set the document keywords.
     pub fn set_keywords(&mut self, keywords: &str) {
         self.ensure_core_properties().keywords = Some(keywords.to_string());
+    }
+
+    /// Set the document category (`cp:category`).
+    pub fn set_category(&mut self, v: &str) {
+        self.ensure_core_properties().category = Some(v.to_string());
+    }
+
+    /// Set the content status (`cp:contentStatus`, e.g. "Draft", "Final").
+    pub fn set_content_status(&mut self, v: &str) {
+        self.ensure_core_properties().content_status = Some(v.to_string());
+    }
+
+    /// Set the document identifier (`dc:identifier`).
+    pub fn set_identifier(&mut self, v: &str) {
+        self.ensure_core_properties().identifier = Some(v.to_string());
+    }
+
+    /// Set the document language (`dc:language`, e.g. "en-US").
+    pub fn set_language(&mut self, v: &str) {
+        self.ensure_core_properties().language = Some(v.to_string());
+    }
+
+    /// Set the revision number (`cp:revision`).
+    pub fn set_revision(&mut self, v: &str) {
+        self.ensure_core_properties().revision = Some(v.to_string());
+    }
+
+    /// Set the version (`cp:version`).
+    pub fn set_version(&mut self, v: &str) {
+        self.ensure_core_properties().version = Some(v.to_string());
+    }
+
+    /// Set the date last printed (`cp:lastPrinted`, W3CDTF, e.g. "2025-01-15T10:30:00Z").
+    pub fn set_last_printed(&mut self, v: &str) {
+        self.ensure_core_properties().last_printed = Some(v.to_string());
     }
 
     fn ensure_core_properties(&mut self) -> &mut CoreProperties {
