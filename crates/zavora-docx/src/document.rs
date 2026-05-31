@@ -1056,6 +1056,54 @@ impl Document {
         self.settings.track_changes = val;
     }
 
+    /// List all tracked changes (revisions) across body and table paragraphs.
+    /// Returns (id, author, is_insertion) per change, in document order.
+    pub fn tracked_changes(&self) -> Vec<(String, String, bool)> {
+        let mut out = Vec::new();
+        for p in self.document.body.paragraphs() {
+            out.extend(p.tracked_changes());
+        }
+        for t in self.document.body.tables() {
+            for row in &t.rows {
+                for cell in &row.cells {
+                    for p in cell.paragraphs() {
+                        out.extend(p.tracked_changes());
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Accept tracked changes: insertions become permanent, deletions are removed.
+    /// `id = None` resolves all changes. Returns the count resolved.
+    pub fn accept_tracked_changes(&mut self, id: Option<&str>) -> usize {
+        self.resolve_all(id, true)
+    }
+
+    /// Reject tracked changes: insertions are removed, deletions are restored.
+    /// `id = None` resolves all changes. Returns the count resolved.
+    pub fn reject_tracked_changes(&mut self, id: Option<&str>) -> usize {
+        self.resolve_all(id, false)
+    }
+
+    fn resolve_all(&mut self, id: Option<&str>, accept: bool) -> usize {
+        let mut n = 0;
+        for p in self.document.body.paragraphs_mut() {
+            n += p.resolve_tracked_changes(id, accept);
+        }
+        for t in self.document.body.tables_mut() {
+            for row in &mut t.rows {
+                for cell in &mut row.cells {
+                    for p in cell.paragraphs_mut() {
+                        n += p.resolve_tracked_changes(id, accept);
+                    }
+                }
+            }
+        }
+        n
+    }
+
     /// Set the document open zoom level as a percentage.
     pub fn set_zoom(&mut self, percent: u32) {
         self.settings.zoom_percent = Some(percent);

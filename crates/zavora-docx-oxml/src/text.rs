@@ -301,6 +301,47 @@ impl CT_P {
         self.runs.last_mut().unwrap()
     }
 
+    /// List tracked changes (w:ins / w:del) stored as raw XML in this paragraph.
+    /// Returns (id, author, is_insertion) per change.
+    pub fn tracked_changes(&self) -> Vec<(String, String, bool)> {
+        self.extra_xml
+            .iter()
+            .filter_map(|(_, raw)| {
+                let ins = tc_kind(raw)?;
+                Some((
+                    attr_val(raw, "w:id").unwrap_or_default(),
+                    attr_val(raw, "w:author").unwrap_or_default(),
+                    ins,
+                ))
+            })
+            .collect()
+    }
+
+    /// Accept or reject tracked changes. If `id` is `None`, applies to all changes.
+    /// Accept: insertions become normal runs, deletions vanish.
+    /// Reject: insertions vanish, deletions become normal runs.
+    /// Returns the number of changes resolved.
+    pub fn resolve_tracked_changes(&mut self, id: Option<&str>, accept: bool) -> usize {
+        let mut resolved = 0;
+        self.extra_xml.retain_mut(|(_, raw)| {
+            let Some(is_ins) = tc_kind(raw) else { return true };
+            if let Some(want) = id
+                && attr_val(raw, "w:id").as_deref() != Some(want)
+            {
+                return true;
+            }
+            resolved += 1;
+            // keep-as-content when (insertion & accept) or (deletion & reject)
+            if is_ins == accept {
+                *raw = unwrap_tracked(raw, is_ins);
+                true
+            } else {
+                false // drop the blob entirely
+            }
+        });
+        resolved
+    }
+
     pub fn from_xml(reader: &mut Reader<&[u8]>) -> Result<Self> {
         let mut properties = None;
         let mut runs = Vec::new();
@@ -529,6 +570,45 @@ impl Default for CT_P {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Returns Some(true) if the raw XML blob is a `w:ins`, Some(false) if `w:del`, else None.
+fn tc_kind(raw: &[u8]) -> Option<bool> {
+    let s = std::str::from_utf8(raw).ok()?;
+    let t = s.trim_start();
+    if t.starts_with("<w:ins") {
+        Some(true)
+    } else if t.starts_with("<w:del") {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// Extract an attribute value (e.g. `w:id`, `w:author`) from a raw element blob.
+fn attr_val(raw: &[u8], key: &str) -> Option<String> {
+    let s = std::str::from_utf8(raw).ok()?;
+    let pat = format!("{}=\"", key);
+    let start = s.find(&pat)? + pat.len();
+    let end = s[start..].find('"')? + start;
+    Some(s[start..end].to_string())
+}
+
+/// Unwrap a resolved tracked change into its inner run(s). For deletions, the
+/// `w:delText` element is renamed to `w:t` so the text becomes normal content.
+fn unwrap_tracked(raw: &[u8], is_ins: bool) -> Vec<u8> {
+    let s = String::from_utf8_lossy(raw);
+    // strip the outer <w:ins ...>...</w:ins> (or w:del) wrapper
+    let inner = match (s.find('>'), if is_ins { s.rfind("</w:ins>") } else { s.rfind("</w:del>") }) {
+        (Some(open), Some(close)) if open + 1 <= close => &s[open + 1..close],
+        _ => return raw.to_vec(),
+    };
+    let inner = if is_ins {
+        inner.to_string()
+    } else {
+        inner.replace("<w:delText", "<w:t").replace("</w:delText>", "</w:t>")
+    };
+    inner.into_bytes()
 }
 
 #[cfg(test)]

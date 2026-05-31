@@ -1555,6 +1555,46 @@ fn parity_sections_collection() {
 }
 
 #[test]
+fn parity_resolve_tracked_changes() {
+    // Author one insertion and one deletion, then resolve.
+    let mut doc = Document::new();
+    {
+        let mut p = doc.add_paragraph("keep ");
+        p.add_tracked_insert("INS", "Agent");
+        p.add_tracked_delete("DEL", "Agent");
+    }
+
+    // Listing: 2 changes, both authored by "Agent"; one ins, one del.
+    let changes = doc.tracked_changes();
+    assert_eq!(changes.len(), 2, "expected 2 tracked changes");
+    assert!(changes.iter().all(|(_, author, _)| author == "Agent"));
+    assert_eq!(changes.iter().filter(|(_, _, ins)| *ins).count(), 1);
+
+    // Accept all: insertion text stays, deletion text removed, no w:ins/w:del left.
+    let n = doc.accept_tracked_changes(None);
+    assert_eq!(n, 2);
+    let xml = part(&doc.to_bytes().expect("serialize"), "word/document.xml");
+    assert!(xml.contains("INS"), "accepted insertion text should remain");
+    assert!(!xml.contains("DEL"), "accepted deletion text should be gone");
+    assert!(!xml.contains("<w:ins"), "no ins wrapper after accept");
+    assert!(!xml.contains("<w:del"), "no del wrapper after accept");
+    assert!(doc.tracked_changes().is_empty(), "no changes remain");
+
+    // Reject path: insertion removed, deletion restored as normal text.
+    let mut doc2 = Document::new();
+    {
+        let mut p = doc2.add_paragraph("keep ");
+        p.add_tracked_insert("INS", "Agent");
+        p.add_tracked_delete("DEL", "Agent");
+    }
+    assert_eq!(doc2.reject_tracked_changes(None), 2);
+    let xml2 = part(&doc2.to_bytes().expect("serialize"), "word/document.xml");
+    assert!(!xml2.contains("INS"), "rejected insertion text should be gone");
+    assert!(xml2.contains("DEL"), "rejected deletion text should be restored");
+    assert!(!xml2.contains("<w:delText"), "delText renamed to w:t on reject");
+}
+
+#[test]
 fn parity_styles_collection() {
     use zavora_docx::{Document, StyleBuilder, StyleType};
     let mut doc = Document::new();
