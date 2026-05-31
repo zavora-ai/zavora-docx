@@ -25,7 +25,7 @@ pub(crate) fn emit_body(
     let mut out = String::new();
     let mut list_stack: Vec<ListState> = Vec::new();
 
-    for content in &body.content {
+    for (node_idx, content) in body.content.iter().enumerate() {
         match content {
             BodyContent::Paragraph(p) => {
                 let list_info = detect_list(p, numbering);
@@ -56,7 +56,8 @@ pub(crate) fn emit_body(
                             });
                         }
                     }
-                    out.push_str("<li>");
+                    let data_p = if options.editable { format!(" data-p=\"{node_idx}\"") } else { String::new() };
+                    out.push_str(&format!("<li{data_p}>"));
                     emit_paragraph_content(&mut out, p, styles, images, hyperlink_urls, options);
                     out.push_str("</li>\n");
                 } else {
@@ -64,7 +65,7 @@ pub(crate) fn emit_body(
                     while !list_stack.is_empty() {
                         close_list(&mut out, &mut list_stack);
                     }
-                    emit_paragraph(&mut out, p, styles, images, hyperlink_urls, options);
+                    emit_paragraph(&mut out, p, Some(node_idx), styles, images, hyperlink_urls, options);
                 }
             }
             BodyContent::Table(tbl) => {
@@ -164,6 +165,7 @@ fn detect_list(para: &CT_P, numbering: Option<&CT_Numbering>) -> Option<(bool, u
 fn emit_paragraph(
     out: &mut String,
     para: &CT_P,
+    node_idx: Option<usize>,
     styles: &CT_Styles,
     images: &HashMap<String, ImageData>,
     hyperlink_urls: &HashMap<String, String>,
@@ -182,10 +184,14 @@ fn emit_paragraph(
     };
 
     let style = css::paragraph_style(para.properties.as_ref());
+    let data_p = match (options.editable, node_idx) {
+        (true, Some(i)) => format!(" data-p=\"{i}\""),
+        _ => String::new(),
+    };
     if style.is_empty() {
-        out.push_str(&format!("<{tag}>"));
+        out.push_str(&format!("<{tag}{data_p}>"));
     } else {
-        out.push_str(&format!("<{tag} style=\"{style}\">"));
+        out.push_str(&format!("<{tag}{data_p} style=\"{style}\">"));
     }
 
     emit_paragraph_content(out, para, styles, images, hyperlink_urls, options);
@@ -457,7 +463,7 @@ fn emit_table(
             for content in &cell.content {
                 match content {
                     CellContent::Paragraph(p) => {
-                        emit_paragraph(out, p, styles, images, hyperlink_urls, options);
+                        emit_paragraph(out, p, None, styles, images, hyperlink_urls, options);
                     }
                     CellContent::Table(nested) => {
                         emit_table(out, nested, styles, images, hyperlink_urls, options);

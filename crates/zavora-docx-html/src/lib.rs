@@ -17,12 +17,16 @@ use zavora_docx_oxml::styles::CT_Styles;
 pub struct HtmlOptions {
     /// Whether to inline images as base64 data URIs (default: true).
     pub inline_images: bool,
+    /// Emit `data-p="{body-index}"` on block elements so an editable HTML view
+    /// can map edits back to document model nodes (default: false).
+    pub editable: bool,
 }
 
 impl Default for HtmlOptions {
     fn default() -> Self {
         Self {
             inline_images: true,
+            editable: false,
         }
     }
 }

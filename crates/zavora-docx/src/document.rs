@@ -3085,6 +3085,17 @@ impl Document {
         zavora_docx_html::to_html_fragment(&input, &zavora_docx_html::HtmlOptions::default())
     }
 
+    /// HTML fragment for an editable view: each top-level block carries
+    /// `data-p="{body-index}"` so in-place edits map back to model nodes
+    /// (the index accepted by `update_paragraph_text` / `insert_paragraph`).
+    pub fn to_editable_html(&self) -> String {
+        let input = self.build_html_input();
+        zavora_docx_html::to_html_fragment(
+            &input,
+            &zavora_docx_html::HtmlOptions { inline_images: true, editable: true },
+        )
+    }
+
     /// Convert the document to Markdown.
     pub fn to_markdown(&self) -> String {
         let input = self.build_html_input();

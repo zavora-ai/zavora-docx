@@ -1579,6 +1579,20 @@ fn parity_text_boxes_overlay_geometry() {
 }
 
 #[test]
+fn parity_editable_html_node_identity() {
+    // Editable HTML view must tag each block with data-p = its body index so
+    // in-place edits map back to update_paragraph_text(index).
+    let mut doc = Document::new();
+    doc.add_paragraph("first");
+    doc.add_paragraph("second");
+    let html = doc.to_editable_html();
+    assert!(html.contains("data-p=\"0\""), "missing data-p=0: {html}");
+    assert!(html.contains("data-p=\"1\""), "missing data-p=1: {html}");
+    // Plain (non-editable) fragment must NOT carry data-p.
+    assert!(!doc.to_html_fragment().contains("data-p"), "plain fragment leaked data-p");
+}
+
+#[test]
 fn parity_resolve_tracked_changes() {
     // Author one insertion and one deletion, then resolve.
     let mut doc = Document::new();
