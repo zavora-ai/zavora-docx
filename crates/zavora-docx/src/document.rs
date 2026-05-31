@@ -3038,7 +3038,10 @@ impl Document {
     pub fn layout_json(&self) -> Result<String> {
         let input = self.build_layout_input();
         let layout = zavora_docx_layout::layout_document(&input)?;
-        Ok(serde_json::to_string(&layout.pages)?)
+        Ok(serde_json::json!({
+            "pages": layout.pages,
+            "fonts": layout.fonts,
+        }).to_string())
     }
 
     /// Render the document to PDF bytes.

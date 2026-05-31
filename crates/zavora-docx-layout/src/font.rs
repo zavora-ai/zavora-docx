@@ -77,13 +77,14 @@ impl FontManager {
     pub fn new() -> Self {
         let mut db = fontdb::Database::new();
 
-        // Load bundled fonts first (lowest priority fallbacks)
+        // Load bundled, metric-compatible fonts only. System fonts are NOT
+        // loaded: a SaaS must render identically on every node regardless of
+        // host OS, and the browser/WASM path has no system fonts either.
+        // Documents needing other fonts supply them via input.fonts (e.g.
+        // DOCX-embedded fonts), loaded later at higher priority.
         for (_family, data) in crate::bundled_fonts::bundled_font_data() {
             db.load_font_data(data.to_vec());
         }
-
-        // Then load system fonts
-        db.load_system_fonts();
 
         FontManager {
             db,

@@ -136,13 +136,14 @@ pub struct PageFrame {
 }
 
 /// Font data for embedding in PDF output.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct FontData {
     /// Font identifier.
     pub id: FontId,
     /// Font family name.
     pub family: String,
     /// Raw TTF/OTF bytes for PDF embedding.
+    #[serde(skip)]
     pub data: Vec<u8>,
     /// Face index within a font collection.
     pub face_index: u32,
