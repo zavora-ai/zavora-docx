@@ -10,7 +10,7 @@ use zavora_docx_oxml::header_footer::{CT_HdrFtr, HdrFtrRef, HdrFtrType};
 use zavora_docx_oxml::numbering::CT_Numbering;
 use zavora_docx_oxml::properties::{CT_PPr, CT_RPr};
 use zavora_docx_oxml::shared::{ST_PageOrientation, ST_SectionType};
-use zavora_docx_oxml::styles::CT_Styles;
+use zavora_docx_oxml::styles::{CT_Styles, StyleType};
 use zavora_docx_oxml::table::CT_Tbl;
 use zavora_docx_oxml::text::{CT_P, CT_R, RunContent};
 
@@ -1859,6 +1859,62 @@ impl Document {
     /// Find a style by its ID.
     pub fn style(&self, style_id: &str) -> Option<Style<'_>> {
         self.styles.get_by_id(style_id).map(|s| Style { inner: s })
+    }
+
+    /// Find a style by its display name (case-sensitive) — mirrors python-docx
+    /// `document.styles['Heading 1']`, which looks up by name.
+    pub fn style_by_name(&self, name: &str) -> Option<Style<'_>> {
+        self.styles
+            .styles
+            .iter()
+            .find(|s| s.name.as_deref() == Some(name))
+            .map(|s| Style { inner: s })
+    }
+
+    /// All styles of a given type (paragraph, character, table, numbering).
+    pub fn styles_of_type(&self, ty: StyleType) -> Vec<Style<'_>> {
+        self.styles
+            .styles
+            .iter()
+            .filter(|s| s.style_type == ty)
+            .map(|s| Style { inner: s })
+            .collect()
+    }
+
+    /// The number of defined styles.
+    pub fn style_count(&self) -> usize {
+        self.styles.styles.len()
+    }
+
+    /// The default style for a given type, if one is marked default.
+    pub fn default_style(&self, ty: StyleType) -> Option<Style<'_>> {
+        self.styles
+            .styles
+            .iter()
+            .find(|s| s.is_default && s.style_type == ty)
+            .map(|s| Style { inner: s })
+    }
+
+    /// Resolve a style's inheritance chain via `basedOn`, from the style itself
+    /// up to its root ancestor. Cycle-safe. Mirrors python-docx style.base_style
+    /// traversal, returned as a ready-to-walk list (most-derived first).
+    pub fn style_base_chain(&self, style_id: &str) -> Vec<Style<'_>> {
+        let mut chain = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let mut current = Some(style_id.to_string());
+        while let Some(id) = current {
+            if !seen.insert(id.clone()) {
+                break; // cycle guard
+            }
+            match self.styles.get_by_id(&id) {
+                Some(s) => {
+                    chain.push(Style { inner: s });
+                    current = s.based_on.clone();
+                }
+                None => break,
+            }
+        }
+        chain
     }
 
     // ---- Style manipulation ----

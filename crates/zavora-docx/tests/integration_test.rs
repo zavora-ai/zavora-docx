@@ -1554,6 +1554,29 @@ fn parity_sections_collection() {
     assert_eq!(doc.sections().len(), doc.section_count());
 }
 
+#[test]
+fn parity_styles_collection() {
+    use zavora_docx::{Document, StyleBuilder, StyleType};
+    let mut doc = Document::new();
+    doc.add_style(StyleBuilder::paragraph("Base", "Base Style").size(12.0));
+    doc.add_style(StyleBuilder::paragraph("Derived", "Derived Style").based_on("Base").bold(true));
+
+    // Lookup by id and by name.
+    assert!(doc.style("Derived").is_some());
+    assert_eq!(doc.style_by_name("Derived Style").unwrap().style_id(), "Derived");
+
+    // Type filtering + accessors.
+    let paras = doc.styles_of_type(StyleType::Paragraph);
+    assert!(paras.iter().any(|s| s.style_id() == "Base"));
+    assert_eq!(doc.style("Derived").unwrap().style_type(), StyleType::Paragraph);
+
+    // basedOn inheritance chain: Derived -> Base.
+    let chain: Vec<String> = doc.style_base_chain("Derived").iter().map(|s| s.style_id().to_string()).collect();
+    assert_eq!(chain, vec!["Derived".to_string(), "Base".to_string()]);
+
+    assert!(doc.style_count() >= 2);
+}
+
 /// Extract a single part's text from a .docx (zip) byte buffer.
 fn part(bytes: &[u8], name: &str) -> String {
     use std::io::Read;

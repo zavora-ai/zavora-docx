@@ -24,6 +24,16 @@ impl<'a> Style<'a> {
         self.inner.based_on.as_deref()
     }
 
+    /// The style applied to the next paragraph after one using this style.
+    pub fn next_style(&self) -> Option<&str> {
+        self.inner.next_style.as_deref()
+    }
+
+    /// The kind of style (paragraph, character, table, numbering).
+    pub fn style_type(&self) -> StyleType {
+        self.inner.style_type
+    }
+
     /// Whether this is the default style for its type.
     pub fn is_default(&self) -> bool {
         self.inner.is_default

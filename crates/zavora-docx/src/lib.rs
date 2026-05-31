@@ -42,4 +42,5 @@ pub use paragraph::{
 };
 pub use run::{BreakKind, Run, RunRef, UnderlineStyle};
 pub use style::{Style, StyleBuilder};
+pub use zavora_docx_oxml::styles::StyleType;
 pub use table::{Cell, CellRef, Row, RowRef, Table, TableRef, VerticalAlignment};
