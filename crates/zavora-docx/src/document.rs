@@ -3297,6 +3297,18 @@ impl Document {
         Ok(pages)
     }
 
+    /// Resolve an image relationship id (the `embed_id` carried by layout glyph
+    /// frames) to its raw bytes and MIME content type. Used to serve images
+    /// referenced by the WYSIWYG renderer.
+    pub fn image_by_embed_id(&self, embed_id: &str) -> Option<(Vec<u8>, String)> {
+        use zavora_docx_opc::relationship::rel_types;
+        let rels = self.package.get_part_rels(&self.doc_part_name)?;
+        let rel = rels.items.iter().find(|r| r.id == embed_id && r.rel_type == rel_types::IMAGE)?;
+        let part_name = OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
+        let data = self.package.get_part(&part_name)?;
+        Some((data.to_vec(), guess_image_content_type(&part_name)))
+    }
+
     /// Build a LayoutInput from the document's current state.
     fn build_layout_input(&self) -> zavora_docx_layout::LayoutInput {
         use zavora_docx_layout::{ImageData, LayoutInput};
