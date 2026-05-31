@@ -105,6 +105,10 @@ pub struct ParagraphBlock {
     pub heading_level: Option<u32>,
     /// Heading text for outline generation.
     pub heading_text: Option<String>,
+    /// Source paragraph ordinal (index among top-level body paragraphs only,
+    /// matching Document::paragraph_mut / the edit tools). None for paragraphs
+    /// that aren't directly editable (table cells, headers/footers, footnotes).
+    pub source_para: Option<usize>,
 }
 
 impl ParagraphBlock {
@@ -154,6 +158,7 @@ pub fn build_paragraph_block(
         widow_control,
         heading_level: None,
         heading_text: None,
+        source_para: None,
     }
 }
 
@@ -199,6 +204,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         assert!((block.content_height() - 26.0).abs() < 0.01);
         assert!((block.total_height() - 40.0).abs() < 0.01);

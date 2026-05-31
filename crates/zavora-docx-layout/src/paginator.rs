@@ -479,6 +479,7 @@ fn render_para_split(para: &ParagraphBlock, split_at: usize, space_before: f64, 
                 widow_control: para.widow_control,
                 heading_level: None,
                 heading_text: None,
+                source_para: para.source_para,
             };
             render_para_split(&temp_para, lines_that_fit, 0.0, pager);
             return;
@@ -604,6 +605,7 @@ fn render_paragraph_lines(
                         italic: seg.italic,
                         field_kind: seg.field_kind,
                         footnote_id: seg.footnote_id,
+                        source_para: para.source_para,
                     }));
 
                     // Render underline
@@ -723,6 +725,7 @@ fn render_paragraph_lines(
                             italic: leader_seg.italic,
                             field_kind: None,
                             footnote_id: None,
+                            source_para: para.source_para,
                         }));
                     }
                     x += width;
@@ -1178,6 +1181,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         }
     }
 
@@ -1278,6 +1282,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         let blocks = vec![LayoutBlock::Paragraph(para)];
         let (pages, _outlines) = paginate(&blocks, PageGeometry::default(), None, false, &fm);
@@ -1308,6 +1313,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         let blocks = vec![LayoutBlock::Paragraph(para)];
         let (pages, _outlines) = paginate(&blocks, PageGeometry::default(), None, false, &fm);
@@ -1374,6 +1380,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         let blocks = vec![LayoutBlock::Paragraph(para)];
         let (pages, _outlines) = paginate(&blocks, PageGeometry::default(), None, false, &fm);
@@ -1418,6 +1425,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         let blocks = vec![LayoutBlock::Paragraph(para)];
         let (pages, _outlines) = paginate(&blocks, PageGeometry::default(), None, false, &fm);
@@ -1452,6 +1460,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         let blocks = vec![LayoutBlock::Paragraph(para)];
         let (pages, _outlines) = paginate(&blocks, PageGeometry::default(), None, false, &fm);
@@ -1481,6 +1490,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         let blocks = vec![LayoutBlock::Paragraph(para)];
         let (pages, _outlines) = paginate(&blocks, PageGeometry::default(), None, false, &fm);
@@ -1577,6 +1587,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
         let blocks = vec![LayoutBlock::Paragraph(para)];
         let (pages, _outlines) = paginate(&blocks, PageGeometry::default(), None, false, &fm);
@@ -1613,6 +1624,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
 
         let blocks = vec![LayoutBlock::Paragraph(para)];
@@ -1657,6 +1669,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
 
         let blocks = vec![LayoutBlock::Paragraph(para)];
@@ -1706,6 +1719,7 @@ mod tests {
             widow_control: true,
             heading_level: None,
             heading_text: None,
+            source_para: None,
         };
 
         let blocks = vec![LayoutBlock::Paragraph(para)];

@@ -91,6 +91,10 @@ pub struct GlyphRun {
     pub field_kind: Option<FieldKind>,
     /// If this glyph run is a footnote/endnote reference marker, its ID.
     pub footnote_id: Option<i32>,
+    /// Source paragraph ordinal this run came from (body paragraphs only),
+    /// for click-to-position hit testing. None for non-editable runs.
+    #[serde(default)]
+    pub source_para: Option<usize>,
 }
 
 /// A positioned element on a page.

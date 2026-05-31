@@ -61,6 +61,8 @@ impl Engine {
         let mut sections: Vec<paginator::Section> = Vec::new();
         let mut current_blocks: Vec<LayoutBlock> = Vec::new();
         let mut current_sect_pr: Option<CT_SectPr> = None; // Will be set from paragraph sect_pr
+        // Ordinal among top-level body paragraphs (matches the edit tools' index).
+        let mut para_ordinal: usize = 0;
 
         for content in &input.document.body.content {
             match content {
@@ -88,6 +90,10 @@ impl Engine {
                         para_block.heading_level = Some(level);
                         para_block.heading_text = Some(para.text());
                     }
+
+                    // Stamp the source paragraph ordinal for click-to-position.
+                    para_block.source_para = Some(para_ordinal);
+                    para_ordinal += 1;
 
                     current_blocks.push(LayoutBlock::Paragraph(para_block));
 
@@ -487,6 +493,7 @@ fn render_page_footnotes(
                         italic: false,
                         field_kind: None,
                         footnote_id: None,
+                        source_para: None,
                     }));
                 }
 
@@ -511,6 +518,7 @@ fn render_page_footnotes(
                                 italic: seg.italic,
                                 field_kind: None,
                                 footnote_id: None,
+                                source_para: None,
                             }));
                         }
                     }
