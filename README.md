@@ -177,20 +177,77 @@ rdocx replace report.docx --find "Draft" --replace "Final" -o final.docx
 rdocx diff v1.docx v2.docx
 ```
 
-## Why pure Rust wins
+## How zavora-docx Compares
 
-Compared to the common alternatives, a native Rust engine avoids the heavy runtimes and external tools they depend on:
+Most DOCX solutions shell out to LibreOffice or wrap C/C++/Java libraries. zavora-docx is a single native binary with zero runtime dependencies, and — beyond the original engine — now ships expanded OOXML coverage (math, charts, shapes, content controls, footnotes, bookmarks, font embedding, glossary/building blocks, custom XML) and non-uniform table column widths.
 
-- **vs. python-docx** — the most popular DOCX library anywhere (~14M downloads/month), but it has *zero* conversion capability. PDF requires bolting on LibreOffice (~500 MB). zavora-docx gives you the same read/write API *plus* built-in PDF/HTML/Markdown in a single ~4 MB binary.
-- **vs. Java (Apache POI / docx4j / Aspose)** — the JVM alone costs 50-100 MB of RAM and 2-5 s cold starts; POI has no built-in PDF; Aspose's high-fidelity PDF costs $1,199+ per developer.
-- **vs. other Rust crates (docx-rs, docx-rust, ooxmlsdk)** — these are read/write only. zavora-docx is the only Rust crate combining DOCX read/write with a built-in layout engine and multi-format output (PDF, HTML, Markdown, PNG).
+### vs. Python Libraries
+
+| | zavora-docx | python-docx | docx2pdf | pypandoc |
+|---|---|---|---|---|
+| Create DOCX | Yes | Yes | -- | -- |
+| Read DOCX | Yes | Yes | -- | -- |
+| DOCX to PDF | Yes (built-in) | No | Via MS Word | Via Pandoc + LaTeX |
+| DOCX to HTML | Yes (built-in) | No | No | Yes (lossy) |
+| DOCX to Markdown | Yes (built-in) | No | No | Yes (lossy) |
+| Math / charts / shapes | Yes | Limited | -- | -- |
+| Layout engine | Yes | None | Delegates to Word | Delegates to LaTeX |
+| External runtime | **None** | None (but no PDF) | **MS Word required** | **Pandoc + LaTeX** |
+| Install size | **~4 MB binary** | ~5 MB | ~31 KB + Word | 300-650 MB |
+| Runs in Docker / CI | Yes | Yes (no PDF) | No | Yes (huge image) |
+| WASM / browser | Yes | No | No | No |
+
+**python-docx** is the most popular DOCX library in any language (~14M downloads/month), but it has **zero conversion capabilities** — no PDF, no HTML, no Markdown. Users who need PDF must bolt on LibreOffice (~500 MB) or a commercial API. zavora-docx gives you the same read/write API *plus* built-in conversion in a single ~4 MB binary.
+
+### vs. Java Libraries
+
+| | zavora-docx | Apache POI | docx4j | Aspose.Words |
+|---|---|---|---|---|
+| Create DOCX | Yes | Yes | Yes | Yes |
+| Read DOCX | Yes | Yes | Yes | Yes |
+| PDF (built-in) | Yes | No | Via FOP (limited) | Yes (high fidelity) |
+| HTML (built-in) | Yes | No | Yes | Yes |
+| License | MIT / Apache-2.0 | Apache-2.0 | Apache-2.0 | **$1,199+** |
+| Total dependency size | **~4 MB** | 18-28 MB + JRE | 50-80 MB + JRE | 14 MB + JRE |
+| Typical memory (moderate doc) | **10-50 MB** | 256 MB - 1 GB | 256 MB - 2 GB | 50-300 MB |
+| Cold start | **< 10 ms** | 2-5 sec | 2-5 sec | 2-5 sec |
+| Runtime required | None | JVM (~200 MB) | JVM (~200 MB) | JVM (~200 MB) |
+
+Java solutions carry the JVM's baseline overhead: 50-100 MB of RAM before a single document is loaded, and 2-5 second cold starts from class loading. Apache POI has **no built-in PDF** at all. docx4j's FOP pipeline is acknowledged by its own maintainer as limited in fidelity. Aspose has excellent PDF output but costs $1,199+ per developer.
+
+### vs. Other Rust Crates
+
+| | zavora-docx | docx-rs | docx-rust | ooxmlsdk |
+|---|---|---|---|---|
+| Create DOCX | Yes | Yes | Yes | Low-level |
+| Read DOCX | Yes | Yes | Yes | Low-level |
+| Round-trip preservation | Yes | Limited | Limited | N/A |
+| Tables, images, headers | Yes | Yes | Basic | Raw XML |
+| Non-uniform column widths | **Yes** | Limited | No | Raw XML |
+| Math / charts / shapes | **Yes** | No | No | Raw XML |
+| Content controls / footnotes / bookmarks | **Yes** | Partial | No | Raw XML |
+| Font embedding / custom XML | **Yes** | No | No | Raw XML |
+| PDF conversion | **Yes** | No | No | No |
+| HTML / Markdown export | **Yes** | No | No | No |
+| Layout engine | **Yes** | No | No | No |
+| Page-to-image rendering | **Yes** | No | No | No |
+| Template engine | **Yes** | No | No | No |
+| Document merging | **Yes** | No | No | No |
+| Regex find/replace | **Yes** | No | No | No |
+| CLI tool | **Yes** | No | No | No |
+| WASM | Yes | Yes | No | No |
+
+**docx-rs** (1M+ downloads, 500+ stars) is the most popular Rust DOCX crate, but it is a read/write library only — no conversion, no layout engine, no PDF. The same is true for every other Rust DOCX crate. zavora-docx is the only Rust crate that combines DOCX read/write with a built-in layout engine, rich OOXML constructs, and multi-format output (PDF, HTML, Markdown, PNG).
+
+### Resource Footprint
 
 | Metric | zavora-docx (native) | Python + LibreOffice | Java (POI + FOP) |
 |---|---|---|---|
 | Binary / install size | **~4 MB** | ~500 MB | ~250 MB (JARs + JRE) |
 | Memory (moderate document) | **10-50 MB** | ~200-500 MB | ~300 MB - 1.5 GB |
-| Cold start | **< 10 ms** | ~2-4 sec | ~2-5 sec |
+| Cold start | **< 10 ms** | ~2-4 sec (LibreOffice) | ~2-5 sec (JVM) |
 | Serverless / Lambda friendly | Yes | Difficult | Difficult |
+| Docker image overhead | **~10 MB** (musl static) | ~500 MB+ | ~250 MB+ |
 | WASM compatible | Yes | No | No |
 
 ## Crate Architecture
