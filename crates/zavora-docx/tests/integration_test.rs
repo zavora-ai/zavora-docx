@@ -1555,6 +1555,30 @@ fn parity_sections_collection() {
 }
 
 #[test]
+fn parity_text_boxes_overlay_geometry() {
+    // The editor overlay derisk: rendered text must expose positioned boxes
+    // with monotonic per-character caret offsets, in page-pixel coordinates.
+    let mut doc = Document::new();
+    doc.add_paragraph("Hello overlay");
+    let pages = doc.text_boxes(96.0).expect("layout");
+    assert!(!pages.is_empty(), "expected at least one page");
+
+    let boxes = &pages[0];
+    assert!(!boxes.is_empty(), "expected text boxes on page 1");
+
+    // Some box contains our text.
+    let b = boxes.iter().find(|b| b.text.contains("Hello")).expect("Hello box");
+    // Positioned within the page, non-zero size.
+    assert!(b.x >= 0.0 && b.y >= 0.0, "box positioned on page");
+    assert!(b.width > 0.0 && b.height > 0.0, "box has size");
+    // Caret offsets: one more than chars, start at 0, strictly increasing, end == width.
+    assert_eq!(b.caret_offsets.len(), b.text.chars().count() + 1, "caret per char + 1");
+    assert_eq!(b.caret_offsets[0], 0.0);
+    assert!(b.caret_offsets.windows(2).all(|w| w[1] > w[0]), "monotonic carets");
+    assert!((b.caret_offsets.last().unwrap() - b.width).abs() < 0.01, "last caret == width");
+}
+
+#[test]
 fn parity_resolve_tracked_changes() {
     // Author one insertion and one deletion, then resolve.
     let mut doc = Document::new();

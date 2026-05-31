@@ -3177,6 +3177,50 @@ impl Document {
         Ok(zavora_docx_pdf::render_all_pages(&layout, dpi))
     }
 
+    /// Per-page positioned text boxes for building an interactive edit/select
+    /// overlay on top of the rendered page images. Coordinates are in pixels at
+    /// the given `dpi` (matching `render_page_to_png`), with the origin at the
+    /// page top-left. Each box carries its text plus per-character x offsets
+    /// (in pixels, relative to the box left) so a click can be mapped to a
+    /// caret position. Returns one `Vec<TextBox>` per page, in page order.
+    pub fn text_boxes(&self, dpi: f64) -> Result<Vec<Vec<TextBox>>> {
+        use zavora_docx_layout::output::PositionedElement;
+        let input = self.build_layout_input();
+        let layout = zavora_docx_layout::layout_document(&input)?;
+        let scale = dpi / 72.0;
+        let pages = layout
+            .pages
+            .iter()
+            .map(|page| {
+                page.elements
+                    .iter()
+                    .filter_map(|el| match el {
+                        PositionedElement::Text(g) if !g.text.is_empty() => {
+                            let mut caret = Vec::with_capacity(g.advances.len() + 1);
+                            let mut acc = 0.0;
+                            caret.push(0.0);
+                            for a in &g.advances {
+                                acc += a * scale;
+                                caret.push(acc);
+                            }
+                            Some(TextBox {
+                                text: g.text.clone(),
+                                x: g.origin.x * scale,
+                                // origin is the baseline; box top ≈ baseline − font ascent (~size).
+                                y: (g.origin.y - g.font_size) * scale,
+                                width: acc,
+                                height: g.font_size * scale,
+                                caret_offsets: caret,
+                            })
+                        }
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .collect();
+        Ok(pages)
+    }
+
     /// Build a LayoutInput from the document's current state.
     fn build_layout_input(&self) -> zavora_docx_layout::LayoutInput {
         use zavora_docx_layout::{ImageData, LayoutInput};
@@ -3652,6 +3696,27 @@ fn guess_image_content_type(part_name: &str) -> String {
         _ => "image/png",
     }
     .to_string()
+}
+
+/// A positioned run of text for building an interactive edit/select overlay
+/// on a rendered page. All coordinates are in pixels at the requested DPI,
+/// origin at the page top-left. See [`Document::text_boxes`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextBox {
+    /// The text of this run.
+    pub text: String,
+    /// Left edge (px).
+    pub x: f64,
+    /// Top edge (px).
+    pub y: f64,
+    /// Width (px).
+    pub width: f64,
+    /// Height (px, ≈ font size).
+    pub height: f64,
+    /// Cumulative x offsets (px, relative to `x`) for each caret position:
+    /// `len == text-glyph count + 1`. `caret_offsets[i]` is the x of the caret
+    /// before character `i`; the last entry is the right edge.
+    pub caret_offsets: Vec<f64>,
 }
 
 /// A node in the document outline tree.
