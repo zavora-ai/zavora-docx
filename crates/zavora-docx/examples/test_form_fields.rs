@@ -4,7 +4,10 @@ fn main() {
     let mut doc = Document::new();
 
     let mut p = doc.add_paragraph("");
-    p.add_run("Form Fields Demo").font("Arial").size(18.0).bold(true);
+    p.add_run("Form Fields Demo")
+        .font("Arial")
+        .size(18.0)
+        .bold(true);
 
     // Text field
     let mut p = doc.add_paragraph("");
@@ -22,14 +25,21 @@ fn main() {
     p.add_checkbox("AgreeTerms", false);
 
     let mut p = doc.add_paragraph("");
-    p.add_run("Subscribe to newsletter: ").font("Arial").size(11.0);
+    p.add_run("Subscribe to newsletter: ")
+        .font("Arial")
+        .size(11.0);
     p.add_checkbox("Newsletter", true);
 
     // Dropdown
     let mut p = doc.add_paragraph("");
     p.add_run("Department: ").font("Arial").size(11.0);
-    p.add_dropdown("Department", &["Engineering", "Marketing", "Sales", "HR"], 0);
+    p.add_dropdown(
+        "Department",
+        &["Engineering", "Marketing", "Sales", "HR"],
+        0,
+    );
 
-    doc.save("/Users/jameskaranja/Downloads/07_form_fields.docx").unwrap();
+    doc.save("/Users/jameskaranja/Downloads/07_form_fields.docx")
+        .unwrap();
     println!("✓ Saved ~/Downloads/07_form_fields.docx");
 }

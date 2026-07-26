@@ -4,8 +4,8 @@
 //! for *building* new controls. Each kind serializes to a complete `w:sdt`
 //! (block-level) that callers push as raw bytes into the body.
 
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 
 use crate::error::Result;
 
@@ -122,9 +122,11 @@ impl CT_Sdt {
         w.write_event(Event::Start(BytesStart::new("w:sdtContent")))?;
         // A single paragraph holding the display/placeholder text.
         let display = match &self.kind {
-            SdtKind::Checkbox(checked) => {
-                Some(if *checked { "\u{2612}".to_string() } else { "\u{2610}".to_string() })
-            }
+            SdtKind::Checkbox(checked) => Some(if *checked {
+                "\u{2612}".to_string()
+            } else {
+                "\u{2610}".to_string()
+            }),
             _ => self.text.clone(),
         };
         w.write_event(Event::Start(BytesStart::new("w:p")))?;
@@ -132,7 +134,9 @@ impl CT_Sdt {
         let mut t = BytesStart::new("w:t");
         t.push_attribute(("xml:space", "preserve"));
         w.write_event(Event::Start(t))?;
-        w.write_event(Event::Text(BytesText::new(display.as_deref().unwrap_or(""))))?;
+        w.write_event(Event::Text(BytesText::new(
+            display.as_deref().unwrap_or(""),
+        )))?;
         w.write_event(Event::End(BytesEnd::new("w:t")))?;
         w.write_event(Event::End(BytesEnd::new("w:r")))?;
         w.write_event(Event::End(BytesEnd::new("w:p")))?;
@@ -163,10 +167,7 @@ mod tests {
     #[test]
     fn dropdown_control() {
         let s = CT_Sdt::new(
-            SdtKind::DropDown(vec![
-                ("Yes".into(), "y".into()),
-                ("No".into(), "n".into()),
-            ]),
+            SdtKind::DropDown(vec![("Yes".into(), "y".into()), ("No".into(), "n".into())]),
             "choice",
         );
         let x = xml(&s);

@@ -8,7 +8,7 @@ use quick_xml::{Reader, Writer};
 use std::io::Write;
 
 use crate::error::Result;
-use crate::namespace::{matches_local_name, W_NS};
+use crate::namespace::{W_NS, matches_local_name};
 use crate::units::Twips;
 
 /// Proofing/theme language triple (`w:themeFontLang`): (val, eastAsia, bidi).
@@ -69,7 +69,8 @@ impl CT_Settings {
                         // root; descend
                     } else if !s.apply_known(&local, &e) {
                         // Unknown element with children: capture the whole subtree.
-                        s.extra_xml.push(crate::raw_xml::capture_element(&mut reader, &e)?);
+                        s.extra_xml
+                            .push(crate::raw_xml::capture_element(&mut reader, &e)?);
                     }
                 }
                 Event::Empty(e) => {
@@ -118,7 +119,11 @@ impl CT_Settings {
     }
 
     pub fn to_xml<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
-        writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), Some("yes"))))?;
+        writer.write_event(Event::Decl(BytesDecl::new(
+            "1.0",
+            Some("UTF-8"),
+            Some("yes"),
+        )))?;
         let mut root = BytesStart::new("w:settings");
         root.push_attribute(("xmlns:w", W_NS));
         writer.write_event(Event::Start(root))?;
@@ -225,14 +230,20 @@ mod tests {
         let s = CT_Settings::from_xml(xml.as_bytes()).unwrap();
         assert!(s.mirror_margins);
         let out = String::from_utf8(s.to_bytes().unwrap()).unwrap();
-        assert!(out.contains("w:doNotExpandShiftReturn"), "lost unknown: {out}");
+        assert!(
+            out.contains("w:doNotExpandShiftReturn"),
+            "lost unknown: {out}"
+        );
     }
 
     #[test]
     fn round_trips_lang() {
         let xml = r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:themeFontLang w:val="fr-FR"/></w:settings>"#;
         let s = CT_Settings::from_xml(xml.as_bytes()).unwrap();
-        assert_eq!(s.theme_font_lang.as_ref().unwrap().val.as_deref(), Some("fr-FR"));
+        assert_eq!(
+            s.theme_font_lang.as_ref().unwrap().val.as_deref(),
+            Some("fr-FR")
+        );
         let out = String::from_utf8(s.to_bytes().unwrap()).unwrap();
         assert!(out.contains(r#"w:val="fr-FR""#), "{out}");
     }

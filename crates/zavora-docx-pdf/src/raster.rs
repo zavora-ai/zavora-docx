@@ -1,7 +1,7 @@
 //! Page-to-image rendering using tiny-skia software rasterizer.
 
-use zavora_docx_layout::{LayoutResult, PageFrame, PositionedElement};
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+use zavora_docx_layout::{LayoutResult, PageFrame, PositionedElement};
 
 /// Render a single page to PNG bytes.
 ///

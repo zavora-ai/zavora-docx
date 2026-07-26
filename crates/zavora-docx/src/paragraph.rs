@@ -141,7 +141,9 @@ impl<'a> Paragraph<'a> {
             ),
             instruction, result
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), xml.into_bytes()));
     }
 
     /// Add a run with the given text and return a mutable reference for chaining.
@@ -164,16 +166,23 @@ impl<'a> Paragraph<'a> {
 
     /// Add a hyperlink run. The `rel_id` should be obtained from `Document::add_hyperlink_rel()`.
     /// For internal links, pass `None` for rel_id and `Some(bookmark)` for anchor.
-    pub fn add_hyperlink_run(&mut self, text: &str, rel_id: Option<&str>, anchor: Option<&str>) -> Run<'_> {
+    pub fn add_hyperlink_run(
+        &mut self,
+        text: &str,
+        rel_id: Option<&str>,
+        anchor: Option<&str>,
+    ) -> Run<'_> {
         let run_start = self.inner.runs.len();
         self.inner.runs.push(CT_R::new(text));
         let run_end = self.inner.runs.len();
-        self.inner.hyperlinks.push(zavora_docx_oxml::text::HyperlinkSpan {
-            rel_id: rel_id.map(|s| s.to_string()),
-            anchor: anchor.map(|s| s.to_string()),
-            run_start,
-            run_end,
-        });
+        self.inner
+            .hyperlinks
+            .push(zavora_docx_oxml::text::HyperlinkSpan {
+                rel_id: rel_id.map(|s| s.to_string()),
+                anchor: anchor.map(|s| s.to_string()),
+                run_start,
+                run_end,
+            });
         Run {
             inner: self.inner.runs.last_mut().unwrap(),
         }
@@ -201,7 +210,9 @@ impl<'a> Paragraph<'a> {
     /// the referenced text and updating on field refresh.
     pub fn cross_reference(&mut self, name: &str) {
         let bm = zavora_docx_oxml::bookmark::CT_Bookmark::new(0, name);
-        self.inner.extra_xml.push((self.inner.runs.len(), bm.cross_reference_xml()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), bm.cross_reference_xml()));
     }
 
     /// Mark the start of a comment range. Place before the commented text runs.
@@ -210,7 +221,9 @@ impl<'a> Paragraph<'a> {
             r#"<w:commentRangeStart w:id="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
             id
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), xml.into_bytes()));
     }
 
     /// Mark the end of a comment range and insert the comment reference. Place after the commented text runs.
@@ -219,13 +232,17 @@ impl<'a> Paragraph<'a> {
             r#"<w:commentRangeEnd w:id="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
             id
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), end_xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), end_xml.into_bytes()));
         // Add a run with commentReference
         let ref_xml = format!(
             r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="{}"/></w:r>"#,
             id
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), ref_xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), ref_xml.into_bytes()));
     }
 
     /// Insert only a comment reference run (no range) — used to anchor a reply
@@ -235,25 +252,35 @@ impl<'a> Paragraph<'a> {
             r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="{}"/></w:r>"#,
             id
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), ref_xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), ref_xml.into_bytes()));
     }
 
     /// Add a tracked insertion (text shown as added in review mode).
     pub fn add_tracked_insert(&mut self, text: &str, author: &str) {
         let xml = format!(
             r#"<w:ins w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>{}</w:t></w:r></w:ins>"#,
-            self.inner.runs.len() + 100, author, text
+            self.inner.runs.len() + 100,
+            author,
+            text
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), xml.into_bytes()));
     }
 
     /// Add a tracked deletion (text shown as strikethrough in review mode).
     pub fn add_tracked_delete(&mut self, text: &str, author: &str) {
         let xml = format!(
             r#"<w:del w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:strike/><w:color w:val="FF0000"/></w:rPr><w:delText>{}</w:delText></w:r></w:del>"#,
-            self.inner.runs.len() + 200, author, text
+            self.inner.runs.len() + 200,
+            author,
+            text
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), xml.into_bytes()));
     }
 
     /// Add a text input form field.
@@ -271,7 +298,9 @@ impl<'a> Paragraph<'a> {
             ),
             name, default_value, default_value
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), xml.into_bytes()));
     }
 
     /// Add a checkbox form field.
@@ -289,7 +318,9 @@ impl<'a> Paragraph<'a> {
             ),
             name, check_val
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), xml.into_bytes()));
     }
 
     /// Add a dropdown form field.
@@ -310,7 +341,9 @@ impl<'a> Paragraph<'a> {
             ),
             name, selected, entries
         );
-        self.inner.extra_xml.push((self.inner.runs.len(), xml.into_bytes()));
+        self.inner
+            .extra_xml
+            .push((self.inner.runs.len(), xml.into_bytes()));
     }
 
     /// Get an iterator over immutable run references.

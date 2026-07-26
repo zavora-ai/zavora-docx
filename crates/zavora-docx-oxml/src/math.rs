@@ -4,8 +4,8 @@
 //! root declares `xmlns:m`. This is the construction path; parsed equations
 //! from existing documents are preserved verbatim elsewhere as raw XML.
 
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 
 use crate::error::Result;
 
@@ -80,12 +80,10 @@ impl MathNode {
                 }
                 Ok(())
             }
-            MathNode::Fraction(num, den) => {
-                elem(w, "m:f", |w| {
-                    arg(w, "m:num", num)?;
-                    arg(w, "m:den", den)
-                })
-            }
+            MathNode::Fraction(num, den) => elem(w, "m:f", |w| {
+                arg(w, "m:num", num)?;
+                arg(w, "m:den", den)
+            }),
             MathNode::Sup(base, sup) => elem(w, "m:sSup", |w| {
                 arg(w, "m:e", base)?;
                 arg(w, "m:sup", sup)
@@ -218,12 +216,12 @@ pub fn from_latex(src: &str) -> MathNode {
 
 #[derive(Debug, Clone, PartialEq)]
 enum Tok {
-    Open,         // {
-    Close,        // }
-    Sup,          // ^
-    Sub,          // _
-    Cmd(String),  // \name
-    Sym(String),  // a single visible char / number run
+    Open,        // {
+    Close,       // }
+    Sup,         // ^
+    Sub,         // _
+    Cmd(String), // \name
+    Sym(String), // a single visible char / number run
 }
 
 fn lex(src: &str) -> Vec<Tok> {
@@ -231,25 +229,49 @@ fn lex(src: &str) -> Vec<Tok> {
     let mut chars = src.chars().peekable();
     while let Some(&c) = chars.peek() {
         match c {
-            '{' => { toks.push(Tok::Open); chars.next(); }
-            '}' => { toks.push(Tok::Close); chars.next(); }
-            '^' => { toks.push(Tok::Sup); chars.next(); }
-            '_' => { toks.push(Tok::Sub); chars.next(); }
-            ' ' | '\t' | '\n' => { chars.next(); }
+            '{' => {
+                toks.push(Tok::Open);
+                chars.next();
+            }
+            '}' => {
+                toks.push(Tok::Close);
+                chars.next();
+            }
+            '^' => {
+                toks.push(Tok::Sup);
+                chars.next();
+            }
+            '_' => {
+                toks.push(Tok::Sub);
+                chars.next();
+            }
+            ' ' | '\t' | '\n' => {
+                chars.next();
+            }
             '\\' => {
                 chars.next();
                 let mut name = String::new();
                 while let Some(&n) = chars.peek() {
-                    if n.is_ascii_alphabetic() { name.push(n); chars.next(); } else { break; }
+                    if n.is_ascii_alphabetic() {
+                        name.push(n);
+                        chars.next();
+                    } else {
+                        break;
+                    }
                 }
                 if name.is_empty() {
                     // escaped symbol like \{ or \,
-                    if let Some(n) = chars.next() { toks.push(Tok::Sym(n.to_string())); }
+                    if let Some(n) = chars.next() {
+                        toks.push(Tok::Sym(n.to_string()));
+                    }
                 } else {
                     toks.push(Tok::Cmd(name));
                 }
             }
-            _ => { toks.push(Tok::Sym(c.to_string())); chars.next(); }
+            _ => {
+                toks.push(Tok::Sym(c.to_string()));
+                chars.next();
+            }
         }
     }
     toks
@@ -260,7 +282,9 @@ fn parse_seq(toks: &[Tok], pos: &mut usize, stop: Option<&Tok>) -> MathNode {
     let mut items: Vec<MathNode> = Vec::new();
     while *pos < toks.len() {
         if let Some(s) = stop {
-            if &toks[*pos] == s { break; }
+            if &toks[*pos] == s {
+                break;
+            }
         }
         match &toks[*pos] {
             Tok::Close => break,
@@ -281,22 +305,39 @@ fn parse_seq(toks: &[Tok], pos: &mut usize, stop: Option<&Tok>) -> MathNode {
             }
         }
     }
-    if items.len() == 1 { items.pop().unwrap() } else { MathNode::Seq(items) }
+    if items.len() == 1 {
+        items.pop().unwrap()
+    } else {
+        MathNode::Seq(items)
+    }
 }
 
 /// Parse a single atom: a group `{...}`, a command, or a symbol.
 fn parse_atom(toks: &[Tok], pos: &mut usize) -> MathNode {
-    if *pos >= toks.len() { return MathNode::Run(String::new()); }
+    if *pos >= toks.len() {
+        return MathNode::Run(String::new());
+    }
     match toks[*pos].clone() {
         Tok::Open => {
             *pos += 1;
             let inner = parse_seq(toks, pos, Some(&Tok::Close));
-            if *pos < toks.len() && toks[*pos] == Tok::Close { *pos += 1; }
+            if *pos < toks.len() && toks[*pos] == Tok::Close {
+                *pos += 1;
+            }
             inner
         }
-        Tok::Cmd(name) => { *pos += 1; parse_cmd(&name, toks, pos) }
-        Tok::Sym(s) => { *pos += 1; MathNode::Run(s) }
-        _ => { *pos += 1; MathNode::Run(String::new()) }
+        Tok::Cmd(name) => {
+            *pos += 1;
+            parse_cmd(&name, toks, pos)
+        }
+        Tok::Sym(s) => {
+            *pos += 1;
+            MathNode::Run(s)
+        }
+        _ => {
+            *pos += 1;
+            MathNode::Run(String::new())
+        }
     }
 }
 
@@ -315,9 +356,15 @@ fn parse_cmd(name: &str, toks: &[Tok], pos: &mut usize) -> MathNode {
                 while *pos < toks.len() && toks[*pos] != Tok::Sym("]".into()) {
                     deg.push(parse_atom(toks, pos));
                 }
-                if *pos < toks.len() { *pos += 1; } // skip ]
+                if *pos < toks.len() {
+                    *pos += 1;
+                } // skip ]
                 let radicand = parse_atom(toks, pos);
-                let d = if deg.len() == 1 { deg.pop().unwrap() } else { MathNode::Seq(deg) };
+                let d = if deg.len() == 1 {
+                    deg.pop().unwrap()
+                } else {
+                    MathNode::Seq(deg)
+                };
                 MathNode::Radical(Some(Box::new(d)), Box::new(radicand))
             } else {
                 MathNode::Radical(None, Box::new(parse_atom(toks, pos)))
@@ -329,7 +376,11 @@ fn parse_cmd(name: &str, toks: &[Tok], pos: &mut usize) -> MathNode {
             let mut inner = Vec::new();
             while *pos < toks.len() {
                 if let Tok::Cmd(c) = &toks[*pos] {
-                    if c == "right" { *pos += 1; let _ = take_delim(toks, pos); break; }
+                    if c == "right" {
+                        *pos += 1;
+                        let _ = take_delim(toks, pos);
+                        break;
+                    }
                 }
                 inner.push(parse_atom(toks, pos));
             }
@@ -337,12 +388,21 @@ fn parse_cmd(name: &str, toks: &[Tok], pos: &mut usize) -> MathNode {
             MathNode::Delimiter(beg, end, vec![flatten(inner)])
         }
         "sum" | "int" | "prod" => {
-            let chr = match name { "sum" => "\u{2211}", "int" => "\u{222B}", _ => "\u{220F}" };
+            let chr = match name {
+                "sum" => "\u{2211}",
+                "int" => "\u{222B}",
+                _ => "\u{220F}",
+            };
             let (mut lo, mut hi) = (MathNode::Run(String::new()), MathNode::Run(String::new()));
             // consume _.. ^.. in any order
             for _ in 0..2 {
-                if *pos < toks.len() && toks[*pos] == Tok::Sub { *pos += 1; lo = parse_atom(toks, pos); }
-                else if *pos < toks.len() && toks[*pos] == Tok::Sup { *pos += 1; hi = parse_atom(toks, pos); }
+                if *pos < toks.len() && toks[*pos] == Tok::Sub {
+                    *pos += 1;
+                    lo = parse_atom(toks, pos);
+                } else if *pos < toks.len() && toks[*pos] == Tok::Sup {
+                    *pos += 1;
+                    hi = parse_atom(toks, pos);
+                }
             }
             let body = parse_atom(toks, pos);
             MathNode::Nary(chr.into(), Box::new(lo), Box::new(hi), Box::new(body))
@@ -366,7 +426,11 @@ fn parse_cmd(name: &str, toks: &[Tok], pos: &mut usize) -> MathNode {
 }
 
 fn flatten(mut v: Vec<MathNode>) -> MathNode {
-    if v.len() == 1 { v.pop().unwrap() } else { MathNode::Seq(v) }
+    if v.len() == 1 {
+        v.pop().unwrap()
+    } else {
+        MathNode::Seq(v)
+    }
 }
 
 fn take_delim(toks: &[Tok], pos: &mut usize) -> String {
@@ -383,14 +447,28 @@ fn take_delim(toks: &[Tok], pos: &mut usize) -> String {
 /// Map a LaTeX Greek command to its Unicode character.
 fn greek(name: &str) -> Option<&'static str> {
     Some(match name {
-        "alpha" => "\u{03B1}", "beta" => "\u{03B2}", "gamma" => "\u{03B3}",
-        "delta" => "\u{03B4}", "epsilon" => "\u{03B5}", "theta" => "\u{03B8}",
-        "lambda" => "\u{03BB}", "mu" => "\u{03BC}", "pi" => "\u{03C0}",
-        "rho" => "\u{03C1}", "sigma" => "\u{03C3}", "phi" => "\u{03C6}",
-        "omega" => "\u{03C9}", "tau" => "\u{03C4}",
-        "Gamma" => "\u{0393}", "Delta" => "\u{0394}", "Theta" => "\u{0398}",
-        "Lambda" => "\u{039B}", "Pi" => "\u{03A0}", "Sigma" => "\u{03A3}",
-        "Phi" => "\u{03A6}", "Omega" => "\u{03A9}",
+        "alpha" => "\u{03B1}",
+        "beta" => "\u{03B2}",
+        "gamma" => "\u{03B3}",
+        "delta" => "\u{03B4}",
+        "epsilon" => "\u{03B5}",
+        "theta" => "\u{03B8}",
+        "lambda" => "\u{03BB}",
+        "mu" => "\u{03BC}",
+        "pi" => "\u{03C0}",
+        "rho" => "\u{03C1}",
+        "sigma" => "\u{03C3}",
+        "phi" => "\u{03C6}",
+        "omega" => "\u{03C9}",
+        "tau" => "\u{03C4}",
+        "Gamma" => "\u{0393}",
+        "Delta" => "\u{0394}",
+        "Theta" => "\u{0398}",
+        "Lambda" => "\u{039B}",
+        "Pi" => "\u{03A0}",
+        "Sigma" => "\u{03A3}",
+        "Phi" => "\u{03A6}",
+        "Omega" => "\u{03A9}",
         _ => return None,
     })
 }
@@ -438,7 +516,11 @@ mod tests {
         ));
         assert!(sum.contains("<m:nary>"), "{sum}");
         assert!(sum.contains(r#"<m:chr m:val="∑"/>"#), "{sum}");
-        let d = s(&MathNode::Delimiter("(".into(), ")".into(), vec![MathNode::run("x")]));
+        let d = s(&MathNode::Delimiter(
+            "(".into(),
+            ")".into(),
+            vec![MathNode::run("x")],
+        ));
         assert!(d.contains(r#"<m:begChr m:val="("/>"#), "{d}");
     }
 

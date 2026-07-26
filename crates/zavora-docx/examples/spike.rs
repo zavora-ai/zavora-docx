@@ -11,9 +11,14 @@ fn main() {
                 i += 1;
             }
             Ok(None) => break,
-            Err(e) => { println!("page {i} error: {e}"); break; }
+            Err(e) => {
+                println!("page {i} error: {e}");
+                break;
+            }
         }
-        if i > 20 { break; }
+        if i > 20 {
+            break;
+        }
     }
     println!("total pages: {i}");
 }

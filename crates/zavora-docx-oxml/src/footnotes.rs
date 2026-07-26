@@ -294,6 +294,9 @@ mod tests {
         assert_eq!(parsed.separators.len(), 2);
         let out = String::from_utf8(parsed.to_xml_footnotes().unwrap()).unwrap();
         assert!(out.contains("w:separator"), "separator lost: {out}");
-        assert!(out.contains("continuationSeparator"), "continuation lost: {out}");
+        assert!(
+            out.contains("continuationSeparator"),
+            "continuation lost: {out}"
+        );
     }
 }

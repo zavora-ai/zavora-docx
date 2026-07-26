@@ -4,16 +4,15 @@
 //! wps:wsp`) emitted as a run inside a paragraph. Like equations, the drawing
 //! is run content, so callers wrap the result in a `w:p`.
 
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 
 use crate::error::Result;
 use crate::units::Emu;
 
 const A_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const WPS_NS: &str = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape";
-const WP_NS: &str =
-    "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+const WP_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
 
 /// A buildable shape or text box.
 #[derive(Debug, Clone, PartialEq)]
@@ -182,7 +181,11 @@ mod tests {
 
     #[test]
     fn text_box_has_content() {
-        let x = s(&Shape::text_box(Emu(2000000), Emu(1000000), vec!["Hello".into()]));
+        let x = s(&Shape::text_box(
+            Emu(2000000),
+            Emu(1000000),
+            vec!["Hello".into()],
+        ));
         assert!(x.contains("wps:wsp"), "{x}");
         assert!(x.contains(r#"txBox="1""#), "{x}");
         assert!(x.contains("<w:txbxContent>"), "{x}");

@@ -56,7 +56,11 @@ pub(crate) fn emit_body(
                             });
                         }
                     }
-                    let data_p = if options.editable { format!(" data-p=\"{node_idx}\"") } else { String::new() };
+                    let data_p = if options.editable {
+                        format!(" data-p=\"{node_idx}\"")
+                    } else {
+                        String::new()
+                    };
                     out.push_str(&format!("<li{data_p}>"));
                     emit_paragraph_content(&mut out, p, styles, images, hyperlink_urls, options);
                     out.push_str("</li>\n");
@@ -65,7 +69,15 @@ pub(crate) fn emit_body(
                     while !list_stack.is_empty() {
                         close_list(&mut out, &mut list_stack);
                     }
-                    emit_paragraph(&mut out, p, Some(node_idx), styles, images, hyperlink_urls, options);
+                    emit_paragraph(
+                        &mut out,
+                        p,
+                        Some(node_idx),
+                        styles,
+                        images,
+                        hyperlink_urls,
+                        options,
+                    );
                 }
             }
             BodyContent::Table(tbl) => {

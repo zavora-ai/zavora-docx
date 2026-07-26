@@ -324,7 +324,9 @@ impl CT_P {
     pub fn resolve_tracked_changes(&mut self, id: Option<&str>, accept: bool) -> usize {
         let mut resolved = 0;
         self.extra_xml.retain_mut(|(_, raw)| {
-            let Some(is_ins) = tc_kind(raw) else { return true };
+            let Some(is_ins) = tc_kind(raw) else {
+                return true;
+            };
             if let Some(want) = id
                 && attr_val(raw, "w:id").as_deref() != Some(want)
             {
@@ -599,14 +601,23 @@ fn attr_val(raw: &[u8], key: &str) -> Option<String> {
 fn unwrap_tracked(raw: &[u8], is_ins: bool) -> Vec<u8> {
     let s = String::from_utf8_lossy(raw);
     // strip the outer <w:ins ...>...</w:ins> (or w:del) wrapper
-    let inner = match (s.find('>'), if is_ins { s.rfind("</w:ins>") } else { s.rfind("</w:del>") }) {
+    let inner = match (
+        s.find('>'),
+        if is_ins {
+            s.rfind("</w:ins>")
+        } else {
+            s.rfind("</w:del>")
+        },
+    ) {
         (Some(open), Some(close)) if open + 1 <= close => &s[open + 1..close],
         _ => return raw.to_vec(),
     };
     let inner = if is_ins {
         inner.to_string()
     } else {
-        inner.replace("<w:delText", "<w:t").replace("</w:delText>", "</w:t>")
+        inner
+            .replace("<w:delText", "<w:t")
+            .replace("</w:delText>", "</w:t>")
     };
     inner.into_bytes()
 }

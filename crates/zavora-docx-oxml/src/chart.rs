@@ -4,8 +4,8 @@
 //! `c:chart` drawing in the body via a relationship. This module builds both
 //! the chart part XML and the referencing drawing run.
 
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 
 use crate::error::Result;
 use crate::units::Emu;
@@ -13,8 +13,7 @@ use crate::units::Emu;
 const C_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
 const A_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const WP_NS: &str =
-    "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+const WP_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
 
 /// Supported chart types.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -223,7 +222,10 @@ impl Chart {
         }
 
         // Data labels (configurable; falls back to a per-kind default).
-        let labels = self.labels.clone().unwrap_or_else(|| Chart::default_labels(self.kind));
+        let labels = self
+            .labels
+            .clone()
+            .unwrap_or_else(|| Chart::default_labels(self.kind));
         w.write_event(Event::Start(BytesStart::new("c:dLbls")))?;
         // Optional fixed text color via c:txPr (must precede the show* flags).
         if let Some(ref hex) = labels.color {
@@ -246,7 +248,10 @@ impl Chart {
         }
         // dLblPos is only valid for pie/bar/column.
         if let Some(pos) = labels.position {
-            if matches!(self.kind, ChartKind::Pie | ChartKind::Bar | ChartKind::Column) {
+            if matches!(
+                self.kind,
+                ChartKind::Pie | ChartKind::Bar | ChartKind::Column
+            ) {
                 str_el(w, "c:dLblPos", pos.as_str())?;
             }
         }
@@ -308,7 +313,12 @@ impl Chart {
         Ok(())
     }
 
-    fn write_num_ref<W: std::io::Write>(&self, w: &mut Writer<W>, f: &str, vals: &[f64]) -> Result<()> {
+    fn write_num_ref<W: std::io::Write>(
+        &self,
+        w: &mut Writer<W>,
+        f: &str,
+        vals: &[f64],
+    ) -> Result<()> {
         w.write_event(Event::Start(BytesStart::new("c:numRef")))?;
         str_el(w, "c:f", f)?;
         w.write_event(Event::Start(BytesStart::new("c:numCache")))?;
@@ -325,14 +335,26 @@ impl Chart {
     fn write_axes<W: std::io::Write>(&self, w: &mut Writer<W>) -> Result<()> {
         // Category axis
         // First axis: value axis for scatter (numeric X), category axis otherwise.
-        let first_ax = if self.kind == ChartKind::Scatter { "c:valAx" } else { "c:catAx" };
+        let first_ax = if self.kind == ChartKind::Scatter {
+            "c:valAx"
+        } else {
+            "c:catAx"
+        };
         w.write_event(Event::Start(BytesStart::new(first_ax)))?;
         idx_el(w, "c:axId", 1)?;
         w.write_event(Event::Start(BytesStart::new("c:scaling")))?;
         str_el(w, "c:orientation", "minMax")?;
         w.write_event(Event::End(BytesEnd::new("c:scaling")))?;
         bool_el(w, "c:delete", false)?;
-        str_el(w, "c:axPos", if self.kind == ChartKind::Bar { "l" } else { "b" })?;
+        str_el(
+            w,
+            "c:axPos",
+            if self.kind == ChartKind::Bar {
+                "l"
+            } else {
+                "b"
+            },
+        )?;
         idx_el(w, "c:crossAx", 2)?;
         w.write_event(Event::End(BytesEnd::new(first_ax)))?;
         // Value axis
@@ -342,7 +364,15 @@ impl Chart {
         str_el(w, "c:orientation", "minMax")?;
         w.write_event(Event::End(BytesEnd::new("c:scaling")))?;
         bool_el(w, "c:delete", false)?;
-        str_el(w, "c:axPos", if self.kind == ChartKind::Bar { "b" } else { "l" })?;
+        str_el(
+            w,
+            "c:axPos",
+            if self.kind == ChartKind::Bar {
+                "b"
+            } else {
+                "l"
+            },
+        )?;
         idx_el(w, "c:crossAx", 1)?;
         w.write_event(Event::End(BytesEnd::new("c:valAx")))?;
         Ok(())
@@ -430,7 +460,10 @@ mod tests {
             kind,
             title: Some("Sales".into()),
             categories: vec!["Q1".into(), "Q2".into(), "Q3".into()],
-            series: vec![Series { name: "2024".into(), values: vec![10.0, 20.0, 15.0] }],
+            series: vec![Series {
+                name: "2024".into(),
+                values: vec![10.0, 20.0, 15.0],
+            }],
             labels: None,
         }
     }
@@ -475,7 +508,10 @@ mod tests {
             kind: ChartKind::Scatter,
             title: Some("XY".into()),
             categories: vec!["1".into(), "2".into(), "3".into()],
-            series: vec![Series { name: "pts".into(), values: vec![2.0, 4.0, 6.0] }],
+            series: vec![Series {
+                name: "pts".into(),
+                values: vec![2.0, 4.0, 6.0],
+            }],
             labels: None,
         };
         let bytes = c.to_part_bytes().unwrap();
@@ -502,8 +538,16 @@ mod tests {
 
     #[test]
     fn drawing_references_rel() {
-        let r = String::from_utf8(sample(ChartKind::Line).to_run_bytes("rId9", Emu(5000000), Emu(3000000)).unwrap()).unwrap();
+        let r = String::from_utf8(
+            sample(ChartKind::Line)
+                .to_run_bytes("rId9", Emu(5000000), Emu(3000000))
+                .unwrap(),
+        )
+        .unwrap();
         assert!(r.contains(r#"r:id="rId9""#), "{r}");
-        assert!(r.contains(r#"uri="http://schemas.openxmlformats.org/drawingml/2006/chart""#), "{r}");
+        assert!(
+            r.contains(r#"uri="http://schemas.openxmlformats.org/drawingml/2006/chart""#),
+            "{r}"
+        );
     }
 }

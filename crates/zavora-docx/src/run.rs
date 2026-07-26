@@ -270,7 +270,10 @@ impl<'a> Run<'a> {
             r#"<w14:shadow w14:blurRad="{}" w14:dist="{}" w14:dir="2700000" w14:sx="100000" w14:sy="100000" w14:algn="tl" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:srgbClr w14:val="{}"><w14:alpha w14:val="60000"/></w14:srgbClr></w14:shadow>"#,
             blur_emu, dist_emu, color
         );
-        self.ensure_rpr().extra_xml.get_or_insert_with(Vec::new).push(xml.into_bytes());
+        self.ensure_rpr()
+            .extra_xml
+            .get_or_insert_with(Vec::new)
+            .push(xml.into_bytes());
         self
     }
 
@@ -281,7 +284,10 @@ impl<'a> Run<'a> {
             r#"<w14:glow w14:rad="{}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:srgbClr w14:val="{}"><w14:alpha w14:val="60000"/></w14:srgbClr></w14:glow>"#,
             rad_emu, color
         );
-        self.ensure_rpr().extra_xml.get_or_insert_with(Vec::new).push(xml.into_bytes());
+        self.ensure_rpr()
+            .extra_xml
+            .get_or_insert_with(Vec::new)
+            .push(xml.into_bytes());
         self
     }
 
@@ -292,14 +298,20 @@ impl<'a> Run<'a> {
             r#"<w14:textOutline w14:w="{}" w14:cap="flat" w14:cmpd="sng" w14:algn="ctr" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:solidFill><w14:srgbClr w14:val="{}"/></w14:solidFill><w14:prstDash w14:val="solid"/></w14:textOutline>"#,
             width_emu, color
         );
-        self.ensure_rpr().extra_xml.get_or_insert_with(Vec::new).push(xml.into_bytes());
+        self.ensure_rpr()
+            .extra_xml
+            .get_or_insert_with(Vec::new)
+            .push(xml.into_bytes());
         self
     }
 
     /// Add a text reflection effect (w14:reflection).
     pub fn reflection(mut self) -> Self {
         let xml = r#"<w14:reflection w14:blurRad="6350" w14:stA="53000" w14:stPos="0" w14:endA="300" w14:endPos="35500" w14:dist="0" w14:dir="5400000" w14:fadeDir="5400000" w14:sx="100000" w14:sy="-90000" w14:kx="0" w14:ky="0" w14:algn="bl" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"/>"#;
-        self.ensure_rpr().extra_xml.get_or_insert_with(Vec::new).push(xml.as_bytes().to_vec());
+        self.ensure_rpr()
+            .extra_xml
+            .get_or_insert_with(Vec::new)
+            .push(xml.as_bytes().to_vec());
         self
     }
 

@@ -128,7 +128,9 @@ impl StyleBuilder {
     /// Line spacing as a multiple of single spacing (1.0 = single, 1.5, 2.0…).
     pub fn line_spacing(mut self, multiple: f64) -> Self {
         let ppr = self.ppr();
-        ppr.line_spacing = Some(zavora_docx_oxml::units::Twips((multiple * 240.0).round() as i32));
+        ppr.line_spacing = Some(zavora_docx_oxml::units::Twips(
+            (multiple * 240.0).round() as i32
+        ));
         ppr.line_rule = Some("auto".to_string());
         self
     }

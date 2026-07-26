@@ -1513,20 +1513,27 @@ fn parity_run_add_break() {
 fn parity_run_add_picture() {
     let mut doc = Document::new();
     let png: &[u8] = &[
-        0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,0x00,0x00,0x00,0x0D,0x49,0x48,0x44,0x52,
-        0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x01,0x08,0x06,0x00,0x00,0x00,0x1F,0x15,0xC4,
-        0x89,0x00,0x00,0x00,0x0A,0x49,0x44,0x41,0x54,0x78,0x9C,0x63,0x00,0x01,0x00,0x00,
-        0x05,0x00,0x01,0x0D,0x0A,0x2D,0xB4,0x00,0x00,0x00,0x00,0x49,0x45,0x4E,0x44,0xAE,
-        0x42,0x60,0x82,
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00,
+        0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
     let rel_id = doc.embed_image(png, "pic.png");
     {
         let mut p = doc.add_paragraph("");
         p.add_run("see: ");
-        p.add_run("").add_picture(&rel_id, zavora_docx::Length::inches(1.0), zavora_docx::Length::inches(1.0));
+        p.add_run("").add_picture(
+            &rel_id,
+            zavora_docx::Length::inches(1.0),
+            zavora_docx::Length::inches(1.0),
+        );
     }
     let xml = part(&doc.to_bytes().expect("serialize"), "word/document.xml");
-    assert!(xml.contains("<w:drawing") || xml.contains("<wp:inline"), "inline drawing missing: {xml}");
+    assert!(
+        xml.contains("<w:drawing") || xml.contains("<wp:inline"),
+        "inline drawing missing: {xml}"
+    );
 }
 
 #[test]
@@ -1539,7 +1546,14 @@ fn parity_core_properties_full() {
     doc.set_revision("4");
     doc.set_version("2.0");
     let xml = part(&doc.to_bytes().expect("serialize"), "docProps/core.xml");
-    for needle in ["cp:category", "cp:contentStatus", "dc:identifier", "dc:language", "cp:revision", "cp:version"] {
+    for needle in [
+        "cp:category",
+        "cp:contentStatus",
+        "dc:identifier",
+        "dc:language",
+        "cp:revision",
+        "cp:version",
+    ] {
         assert!(xml.contains(needle), "missing {needle}: {xml}");
     }
 }
@@ -1548,9 +1562,14 @@ fn parity_core_properties_full() {
 fn parity_sections_collection() {
     use zavora_docx::SectionBreak;
     let mut doc = Document::new();
-    doc.add_paragraph("section one").section_break(SectionBreak::NextPage);
+    doc.add_paragraph("section one")
+        .section_break(SectionBreak::NextPage);
     doc.add_paragraph("section two");
-    assert!(doc.section_count() >= 2, "expected >=2 sections, got {}", doc.section_count());
+    assert!(
+        doc.section_count() >= 2,
+        "expected >=2 sections, got {}",
+        doc.section_count()
+    );
     assert_eq!(doc.sections().len(), doc.section_count());
 }
 
@@ -1567,15 +1586,28 @@ fn parity_text_boxes_overlay_geometry() {
     assert!(!boxes.is_empty(), "expected text boxes on page 1");
 
     // Some box contains our text.
-    let b = boxes.iter().find(|b| b.text.contains("Hello")).expect("Hello box");
+    let b = boxes
+        .iter()
+        .find(|b| b.text.contains("Hello"))
+        .expect("Hello box");
     // Positioned within the page, non-zero size.
     assert!(b.x >= 0.0 && b.y >= 0.0, "box positioned on page");
     assert!(b.width > 0.0 && b.height > 0.0, "box has size");
     // Caret offsets: one more than chars, start at 0, strictly increasing, end == width.
-    assert_eq!(b.caret_offsets.len(), b.text.chars().count() + 1, "caret per char + 1");
+    assert_eq!(
+        b.caret_offsets.len(),
+        b.text.chars().count() + 1,
+        "caret per char + 1"
+    );
     assert_eq!(b.caret_offsets[0], 0.0);
-    assert!(b.caret_offsets.windows(2).all(|w| w[1] > w[0]), "monotonic carets");
-    assert!((b.caret_offsets.last().unwrap() - b.width).abs() < 0.01, "last caret == width");
+    assert!(
+        b.caret_offsets.windows(2).all(|w| w[1] > w[0]),
+        "monotonic carets"
+    );
+    assert!(
+        (b.caret_offsets.last().unwrap() - b.width).abs() < 0.01,
+        "last caret == width"
+    );
 }
 
 #[test]
@@ -1589,7 +1621,10 @@ fn parity_editable_html_node_identity() {
     assert!(html.contains("data-p=\"0\""), "missing data-p=0: {html}");
     assert!(html.contains("data-p=\"1\""), "missing data-p=1: {html}");
     // Plain (non-editable) fragment must NOT carry data-p.
-    assert!(!doc.to_html_fragment().contains("data-p"), "plain fragment leaked data-p");
+    assert!(
+        !doc.to_html_fragment().contains("data-p"),
+        "plain fragment leaked data-p"
+    );
 }
 
 #[test]
@@ -1613,7 +1648,10 @@ fn parity_resolve_tracked_changes() {
     assert_eq!(n, 2);
     let xml = part(&doc.to_bytes().expect("serialize"), "word/document.xml");
     assert!(xml.contains("INS"), "accepted insertion text should remain");
-    assert!(!xml.contains("DEL"), "accepted deletion text should be gone");
+    assert!(
+        !xml.contains("DEL"),
+        "accepted deletion text should be gone"
+    );
     assert!(!xml.contains("<w:ins"), "no ins wrapper after accept");
     assert!(!xml.contains("<w:del"), "no del wrapper after accept");
     assert!(doc.tracked_changes().is_empty(), "no changes remain");
@@ -1627,9 +1665,18 @@ fn parity_resolve_tracked_changes() {
     }
     assert_eq!(doc2.reject_tracked_changes(None), 2);
     let xml2 = part(&doc2.to_bytes().expect("serialize"), "word/document.xml");
-    assert!(!xml2.contains("INS"), "rejected insertion text should be gone");
-    assert!(xml2.contains("DEL"), "rejected deletion text should be restored");
-    assert!(!xml2.contains("<w:delText"), "delText renamed to w:t on reject");
+    assert!(
+        !xml2.contains("INS"),
+        "rejected insertion text should be gone"
+    );
+    assert!(
+        xml2.contains("DEL"),
+        "rejected deletion text should be restored"
+    );
+    assert!(
+        !xml2.contains("<w:delText"),
+        "delText renamed to w:t on reject"
+    );
 }
 
 #[test]
@@ -1637,19 +1684,33 @@ fn parity_styles_collection() {
     use zavora_docx::{Document, StyleBuilder, StyleType};
     let mut doc = Document::new();
     doc.add_style(StyleBuilder::paragraph("Base", "Base Style").size(12.0));
-    doc.add_style(StyleBuilder::paragraph("Derived", "Derived Style").based_on("Base").bold(true));
+    doc.add_style(
+        StyleBuilder::paragraph("Derived", "Derived Style")
+            .based_on("Base")
+            .bold(true),
+    );
 
     // Lookup by id and by name.
     assert!(doc.style("Derived").is_some());
-    assert_eq!(doc.style_by_name("Derived Style").unwrap().style_id(), "Derived");
+    assert_eq!(
+        doc.style_by_name("Derived Style").unwrap().style_id(),
+        "Derived"
+    );
 
     // Type filtering + accessors.
     let paras = doc.styles_of_type(StyleType::Paragraph);
     assert!(paras.iter().any(|s| s.style_id() == "Base"));
-    assert_eq!(doc.style("Derived").unwrap().style_type(), StyleType::Paragraph);
+    assert_eq!(
+        doc.style("Derived").unwrap().style_type(),
+        StyleType::Paragraph
+    );
 
     // basedOn inheritance chain: Derived -> Base.
-    let chain: Vec<String> = doc.style_base_chain("Derived").iter().map(|s| s.style_id().to_string()).collect();
+    let chain: Vec<String> = doc
+        .style_base_chain("Derived")
+        .iter()
+        .map(|s| s.style_id().to_string())
+        .collect();
     assert_eq!(chain, vec!["Derived".to_string(), "Base".to_string()]);
 
     assert!(doc.style_count() >= 2);
@@ -1659,7 +1720,9 @@ fn parity_styles_collection() {
 fn part(bytes: &[u8], name: &str) -> String {
     use std::io::Read;
     let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).expect("zip");
-    let mut f = zip.by_name(name).unwrap_or_else(|_| panic!("missing {name}"));
+    let mut f = zip
+        .by_name(name)
+        .unwrap_or_else(|_| panic!("missing {name}"));
     let mut s = String::new();
     f.read_to_string(&mut s).expect("utf8");
     s

@@ -755,15 +755,19 @@ impl CT_Document {
             let open = format!("<{prefix}:");
             let attr = format!(" {prefix}:");
             let xmlns = format!("xmlns:{prefix}=");
-            body_bytes
-                .windows(open.len())
-                .any(|w| w == open.as_bytes())
+            body_bytes.windows(open.len()).any(|w| w == open.as_bytes())
                 || body_bytes.windows(attr.len()).any(|w| w == attr.as_bytes())
-                || body_bytes.windows(xmlns.len()).any(|w| w == xmlns.as_bytes())
+                || body_bytes
+                    .windows(xmlns.len())
+                    .any(|w| w == xmlns.as_bytes())
         };
 
         let mut writer = Writer::new(Vec::new());
-        writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), Some("yes"))))?;
+        writer.write_event(Event::Decl(BytesDecl::new(
+            "1.0",
+            Some("UTF-8"),
+            Some("yes"),
+        )))?;
 
         let mut doc_start = BytesStart::new("w:document");
         doc_start.push_attribute(("xmlns:w", W_NS));
@@ -777,34 +781,67 @@ impl CT_Document {
         ));
 
         // Track which extra namespaces were already declared (to avoid dupes).
-        let extra_keys: std::collections::HashSet<&str> =
-            self.extra_namespaces.iter().map(|(k, _)| k.as_str()).collect();
+        let extra_keys: std::collections::HashSet<&str> = self
+            .extra_namespaces
+            .iter()
+            .map(|(k, _)| k.as_str())
+            .collect();
 
         // Conditionally declare optional namespaces only when the body uses them.
         let optional: &[(&str, &str, &str)] = &[
-            ("wp", "xmlns:wp", "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"),
-            ("a", "xmlns:a", "http://schemas.openxmlformats.org/drawingml/2006/main"),
-            ("w14", "xmlns:w14", "http://schemas.microsoft.com/office/word/2010/wordml"),
-            ("m", "xmlns:m", "http://schemas.openxmlformats.org/officeDocument/2006/math"),
-            ("wps", "xmlns:wps", "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"),
-            ("c", "xmlns:c", "http://schemas.openxmlformats.org/drawingml/2006/chart"),
+            (
+                "wp",
+                "xmlns:wp",
+                "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            ),
+            (
+                "a",
+                "xmlns:a",
+                "http://schemas.openxmlformats.org/drawingml/2006/main",
+            ),
+            (
+                "w14",
+                "xmlns:w14",
+                "http://schemas.microsoft.com/office/word/2010/wordml",
+            ),
+            (
+                "m",
+                "xmlns:m",
+                "http://schemas.openxmlformats.org/officeDocument/2006/math",
+            ),
+            (
+                "wps",
+                "xmlns:wps",
+                "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+            ),
+            (
+                "c",
+                "xmlns:c",
+                "http://schemas.openxmlformats.org/drawingml/2006/chart",
+            ),
         ];
         let mut declared_w14 = false;
         for (prefix, key, ns) in optional {
             if extra_keys.contains(*key) {
-                if *prefix == "w14" { declared_w14 = true; }
+                if *prefix == "w14" {
+                    declared_w14 = true;
+                }
                 continue; // will be replayed below
             }
             if used(prefix) {
                 doc_start.push_attribute((*key, *ns));
-                if *prefix == "w14" { declared_w14 = true; }
+                if *prefix == "w14" {
+                    declared_w14 = true;
+                }
             }
         }
 
         // Replay captured extra namespaces (from a loaded document).
         for (key, val) in &self.extra_namespaces {
             doc_start.push_attribute((key.as_str(), val.as_str()));
-            if key == "xmlns:w14" { declared_w14 = true; }
+            if key == "xmlns:w14" {
+                declared_w14 = true;
+            }
         }
 
         // mc:Ignorable lists the markup-compatibility-ignorable prefixes present.
@@ -1084,7 +1121,11 @@ mod tests {
         let math_src = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p></w:body></w:document>"#;
         let parsed2 = CT_Document::from_xml(math_src.as_bytes()).unwrap();
         let s2 = String::from_utf8(parsed2.to_xml().unwrap()).unwrap();
-        assert_eq!(s2.matches("xmlns:m=").count(), 1, "math ns missing/dup: {s2}");
+        assert_eq!(
+            s2.matches("xmlns:m=").count(),
+            1,
+            "math ns missing/dup: {s2}"
+        );
         // ...and a plain text-only body must NOT declare xmlns:m.
         let plain = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hi</w:t></w:r></w:p></w:body></w:document>"#;
         let parsed3 = CT_Document::from_xml(plain.as_bytes()).unwrap();

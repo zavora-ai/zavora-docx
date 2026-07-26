@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use pdf_writer::types::{SystemInfo, UnicodeCmap};
 use pdf_writer::{Name, Str};
-use zavora_docx_layout::{FontData, FontId, LayoutResult, PositionedElement};
 use subsetter::GlyphRemapper;
+use zavora_docx_layout::{FontData, FontId, LayoutResult, PositionedElement};
 
 /// Per-font glyph usage collected across all pages.
 pub(crate) struct FontUsage {

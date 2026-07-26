@@ -443,8 +443,12 @@ impl CT_Styles {
             outline_lvl: Some(lvl),
             ..Default::default()
         };
-        let para_style = |id: &str, name: &str, based: Option<&str>, next: Option<&str>,
-                          ppr: Option<CT_PPr>, rpr: Option<CT_RPr>| CT_Style {
+        let para_style = |id: &str,
+                          name: &str,
+                          based: Option<&str>,
+                          next: Option<&str>,
+                          ppr: Option<CT_PPr>,
+                          rpr: Option<CT_RPr>| CT_Style {
             style_id: id.to_string(),
             style_type: StyleType::Paragraph,
             name: Some(name.to_string()),
@@ -469,69 +473,192 @@ impl CT_Styles {
         };
 
         // Title: large, no outline level (it's the doc title, not a heading)
-        let title = para_style("Title", "Title", Some("Normal"), Some("Normal"),
-            Some(CT_PPr { space_after: Some(Twips(80)), ..Default::default() }),
+        let title = para_style(
+            "Title",
+            "Title",
+            Some("Normal"),
+            Some("Normal"),
+            Some(CT_PPr {
+                space_after: Some(Twips(80)),
+                ..Default::default()
+            }),
             Some(CT_RPr {
                 font_ascii_theme: Some("majorHAnsi".to_string()),
                 font_hansi_theme: Some("majorHAnsi".to_string()),
-                sz: Some(HalfPoint(56)), sz_cs: Some(HalfPoint(56)),
+                sz: Some(HalfPoint(56)),
+                sz_cs: Some(HalfPoint(56)),
                 color: Some("000000".to_string()),
                 spacing: Some(Twips(-10)),
                 ..Default::default()
-            }));
+            }),
+        );
 
-        let subtitle = para_style("Subtitle", "Subtitle", Some("Normal"), Some("Normal"),
-            Some(CT_PPr { space_after: Some(Twips(160)), ..Default::default() }),
+        let subtitle = para_style(
+            "Subtitle",
+            "Subtitle",
+            Some("Normal"),
+            Some("Normal"),
+            Some(CT_PPr {
+                space_after: Some(Twips(160)),
+                ..Default::default()
+            }),
             Some(CT_RPr {
                 font_ascii_theme: Some("minorHAnsi".to_string()),
                 font_hansi_theme: Some("minorHAnsi".to_string()),
-                sz: Some(HalfPoint(28)), sz_cs: Some(HalfPoint(28)),
-                italic: Some(true), italic_cs: Some(true),
+                sz: Some(HalfPoint(28)),
+                sz_cs: Some(HalfPoint(28)),
+                italic: Some(true),
+                italic_cs: Some(true),
                 color: Some("5A5A5A".to_string()),
                 ..Default::default()
-            }));
+            }),
+        );
 
         // Headings 1-6 with descending sizes, all with outline levels 0-5
-        let h1 = para_style("Heading1", "heading 1", Some("Normal"), Some("Normal"),
-            Some(heading_ppr(240, 0, 0)), Some(heading_rpr(32, "2F5496", true)));
-        let h2 = para_style("Heading2", "heading 2", Some("Normal"), Some("Normal"),
-            Some(heading_ppr(160, 0, 1)), Some(heading_rpr(26, "2F5496", true)));
-        let h3 = para_style("Heading3", "heading 3", Some("Normal"), Some("Normal"),
-            Some(heading_ppr(160, 0, 2)), Some(heading_rpr(24, "1F3763", true)));
-        let h4 = para_style("Heading4", "heading 4", Some("Normal"), Some("Normal"),
-            Some(heading_ppr(80, 0, 3)), Some(CT_RPr { italic: Some(true), italic_cs: Some(true), ..heading_rpr(22, "2F5496", false) }));
-        let h5 = para_style("Heading5", "heading 5", Some("Normal"), Some("Normal"),
-            Some(heading_ppr(80, 0, 4)), Some(heading_rpr(22, "2F5496", false)));
-        let h6 = para_style("Heading6", "heading 6", Some("Normal"), Some("Normal"),
-            Some(heading_ppr(40, 0, 5)), Some(CT_RPr { italic: Some(true), italic_cs: Some(true), ..heading_rpr(22, "1F3763", false) }));
+        let h1 = para_style(
+            "Heading1",
+            "heading 1",
+            Some("Normal"),
+            Some("Normal"),
+            Some(heading_ppr(240, 0, 0)),
+            Some(heading_rpr(32, "2F5496", true)),
+        );
+        let h2 = para_style(
+            "Heading2",
+            "heading 2",
+            Some("Normal"),
+            Some("Normal"),
+            Some(heading_ppr(160, 0, 1)),
+            Some(heading_rpr(26, "2F5496", true)),
+        );
+        let h3 = para_style(
+            "Heading3",
+            "heading 3",
+            Some("Normal"),
+            Some("Normal"),
+            Some(heading_ppr(160, 0, 2)),
+            Some(heading_rpr(24, "1F3763", true)),
+        );
+        let h4 = para_style(
+            "Heading4",
+            "heading 4",
+            Some("Normal"),
+            Some("Normal"),
+            Some(heading_ppr(80, 0, 3)),
+            Some(CT_RPr {
+                italic: Some(true),
+                italic_cs: Some(true),
+                ..heading_rpr(22, "2F5496", false)
+            }),
+        );
+        let h5 = para_style(
+            "Heading5",
+            "heading 5",
+            Some("Normal"),
+            Some("Normal"),
+            Some(heading_ppr(80, 0, 4)),
+            Some(heading_rpr(22, "2F5496", false)),
+        );
+        let h6 = para_style(
+            "Heading6",
+            "heading 6",
+            Some("Normal"),
+            Some("Normal"),
+            Some(heading_ppr(40, 0, 5)),
+            Some(CT_RPr {
+                italic: Some(true),
+                italic_cs: Some(true),
+                ..heading_rpr(22, "1F3763", false)
+            }),
+        );
 
-        let quote = para_style("Quote", "Quote", Some("Normal"), Some("Normal"),
+        let quote = para_style(
+            "Quote",
+            "Quote",
+            Some("Normal"),
+            Some("Normal"),
             Some(CT_PPr {
-                space_before: Some(Twips(200)), space_after: Some(Twips(200)),
-                ind_left: Some(Twips(720)), ind_right: Some(Twips(720)),
+                space_before: Some(Twips(200)),
+                space_after: Some(Twips(200)),
+                ind_left: Some(Twips(720)),
+                ind_right: Some(Twips(720)),
                 ..Default::default()
             }),
-            Some(CT_RPr { italic: Some(true), italic_cs: Some(true), color: Some("404040".to_string()), ..body_rpr() }));
+            Some(CT_RPr {
+                italic: Some(true),
+                italic_cs: Some(true),
+                color: Some("404040".to_string()),
+                ..body_rpr()
+            }),
+        );
 
-        let intense_quote = para_style("IntenseQuote", "Intense Quote", Some("Normal"), Some("Normal"),
+        let intense_quote = para_style(
+            "IntenseQuote",
+            "Intense Quote",
+            Some("Normal"),
+            Some("Normal"),
             Some(CT_PPr {
-                space_before: Some(Twips(200)), space_after: Some(Twips(200)),
-                ind_left: Some(Twips(720)), ind_right: Some(Twips(720)),
+                space_before: Some(Twips(200)),
+                space_after: Some(Twips(200)),
+                ind_left: Some(Twips(720)),
+                ind_right: Some(Twips(720)),
                 borders: Some(crate::borders::CT_PBdr {
-                    bottom: Some(crate::borders::CT_BorderEdge { val: crate::shared::ST_Border::Single, sz: Some(8), space: Some(10), color: Some("4472C4".to_string()) }),
-                    top: Some(crate::borders::CT_BorderEdge { val: crate::shared::ST_Border::Single, sz: Some(8), space: Some(10), color: Some("4472C4".to_string()) }),
+                    bottom: Some(crate::borders::CT_BorderEdge {
+                        val: crate::shared::ST_Border::Single,
+                        sz: Some(8),
+                        space: Some(10),
+                        color: Some("4472C4".to_string()),
+                    }),
+                    top: Some(crate::borders::CT_BorderEdge {
+                        val: crate::shared::ST_Border::Single,
+                        sz: Some(8),
+                        space: Some(10),
+                        color: Some("4472C4".to_string()),
+                    }),
                     ..Default::default()
                 }),
                 ..Default::default()
             }),
-            Some(CT_RPr { italic: Some(true), italic_cs: Some(true), bold: Some(true), color: Some("4472C4".to_string()), color_theme: Some("accent1".to_string()), ..body_rpr() }));
+            Some(CT_RPr {
+                italic: Some(true),
+                italic_cs: Some(true),
+                bold: Some(true),
+                color: Some("4472C4".to_string()),
+                color_theme: Some("accent1".to_string()),
+                ..body_rpr()
+            }),
+        );
 
-        let list_paragraph = para_style("ListParagraph", "List Paragraph", Some("Normal"), None,
-            Some(CT_PPr { ind_left: Some(Twips(720)), ..Default::default() }), None);
+        let list_paragraph = para_style(
+            "ListParagraph",
+            "List Paragraph",
+            Some("Normal"),
+            None,
+            Some(CT_PPr {
+                ind_left: Some(Twips(720)),
+                ..Default::default()
+            }),
+            None,
+        );
 
-        let caption = para_style("Caption", "caption", Some("Normal"), Some("Normal"),
-            Some(CT_PPr { space_after: Some(Twips(200)), ..Default::default() }),
-            Some(CT_RPr { italic: Some(true), italic_cs: Some(true), sz: Some(HalfPoint(18)), sz_cs: Some(HalfPoint(18)), color: Some("44546A".to_string()), ..body_rpr() }));
+        let caption = para_style(
+            "Caption",
+            "caption",
+            Some("Normal"),
+            Some("Normal"),
+            Some(CT_PPr {
+                space_after: Some(Twips(200)),
+                ..Default::default()
+            }),
+            Some(CT_RPr {
+                italic: Some(true),
+                italic_cs: Some(true),
+                sz: Some(HalfPoint(18)),
+                sz_cs: Some(HalfPoint(18)),
+                color: Some("44546A".to_string()),
+                ..body_rpr()
+            }),
+        );
 
         let doc_defaults = CT_DocDefaults {
             rpr: Some(CT_RPr {
@@ -552,7 +679,21 @@ impl CT_Styles {
 
         CT_Styles {
             doc_defaults: Some(doc_defaults),
-            styles: vec![normal, title, subtitle, h1, h2, h3, h4, h5, h6, quote, intense_quote, list_paragraph, caption],
+            styles: vec![
+                normal,
+                title,
+                subtitle,
+                h1,
+                h2,
+                h3,
+                h4,
+                h5,
+                h6,
+                quote,
+                intense_quote,
+                list_paragraph,
+                caption,
+            ],
             extra_xml: None,
         }
     }

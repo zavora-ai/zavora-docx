@@ -32,15 +32,15 @@ pub mod table;
 pub use document::{AccessibilityIssue, Document, ImageInfo, IssueSeverity, LinkInfo, OutlineNode};
 pub use error::{Error, Result};
 pub use length::Length;
-pub use zavora_docx_oxml::bookmark::CT_Bookmark;
-pub use zavora_docx_oxml::chart::{Chart, ChartKind, DataLabels, LabelPosition, Series};
-pub use zavora_docx_oxml::drawing::PicProps;
-pub use zavora_docx_oxml::math::MathNode;
-pub use zavora_docx_oxml::sdt::SdtKind;
 pub use paragraph::{
     Alignment, BorderStyle, Paragraph, ParagraphRef, SectionBreak, TabAlignment, TabLeader,
 };
 pub use run::{BreakKind, Run, RunRef, UnderlineStyle};
 pub use style::{Style, StyleBuilder};
-pub use zavora_docx_oxml::styles::StyleType;
 pub use table::{Cell, CellRef, Row, RowRef, Table, TableRef, VerticalAlignment};
+pub use zavora_docx_oxml::bookmark::CT_Bookmark;
+pub use zavora_docx_oxml::chart::{Chart, ChartKind, DataLabels, LabelPosition, Series};
+pub use zavora_docx_oxml::drawing::PicProps;
+pub use zavora_docx_oxml::math::MathNode;
+pub use zavora_docx_oxml::sdt::SdtKind;
+pub use zavora_docx_oxml::styles::StyleType;

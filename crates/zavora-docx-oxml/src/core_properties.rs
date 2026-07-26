@@ -58,8 +58,8 @@ impl CoreProperties {
                     match local {
                         "title" | "creator" | "subject" | "description" | "keywords"
                         | "lastModifiedBy" | "created" | "modified" | "category"
-                        | "contentStatus" | "identifier" | "language" | "revision"
-                        | "version" | "lastPrinted" => {
+                        | "contentStatus" | "identifier" | "language" | "revision" | "version"
+                        | "lastPrinted" => {
                             current_tag = Some(local.to_string());
                         }
                         _ => {

@@ -4,11 +4,16 @@ fn main() {
     let mut doc = Document::new();
 
     let mut p = doc.add_paragraph("");
-    p.add_run("Track Changes Demo").font("Arial").size(18.0).bold(true);
+    p.add_run("Track Changes Demo")
+        .font("Arial")
+        .size(18.0)
+        .bold(true);
 
     // Paragraph with tracked insertion
     let mut p = doc.add_paragraph("");
-    p.add_run("This is the original text. ").font("Arial").size(11.0);
+    p.add_run("This is the original text. ")
+        .font("Arial")
+        .size(11.0);
     p.add_tracked_insert("This text was added by the reviewer.", "James K");
 
     // Paragraph with tracked deletion
@@ -22,6 +27,7 @@ fn main() {
     p.add_tracked_delete("Old heading text", "Editor");
     p.add_tracked_insert("New improved heading text", "Editor");
 
-    doc.save("/Users/jameskaranja/Downloads/06_track_changes.docx").unwrap();
+    doc.save("/Users/jameskaranja/Downloads/06_track_changes.docx")
+        .unwrap();
     println!("✓ Saved ~/Downloads/06_track_changes.docx");
 }

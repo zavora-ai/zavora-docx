@@ -177,16 +177,28 @@ impl Document {
         let footnotes = if let Some(rels) = package.get_part_rels(&doc_part_name) {
             if let Some(rel) = rels.get_by_type(rel_types::FOOTNOTES) {
                 let part = OpcPackage::resolve_rel_target(&doc_part_name, &rel.target);
-                package.get_part(&part).and_then(|xml| zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
-            } else { None }
-        } else { None };
+                package
+                    .get_part(&part)
+                    .and_then(|xml| zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         let endnotes = if let Some(rels) = package.get_part_rels(&doc_part_name) {
             if let Some(rel) = rels.get_by_type(rel_types::ENDNOTES) {
                 let part = OpcPackage::resolve_rel_target(&doc_part_name, &rel.target);
-                package.get_part(&part).and_then(|xml| zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
-            } else { None }
-        } else { None };
+                package
+                    .get_part(&part)
+                    .and_then(|xml| zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         // Load settings.xml (typed; unknown children preserved) for round-trip.
         let settings = package
@@ -266,10 +278,13 @@ impl Document {
                 let odttf = obfuscate_odttf(data, &guid);
                 let part = format!("/word/fonts/font{}.odttf", i + 1);
                 self.package.set_part(&part, odttf);
-                let rel_id = self.package.get_or_create_part_rels("/word/fontTable.xml").add(
-                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
-                    &format!("fonts/font{}.odttf", i + 1),
-                );
+                let rel_id = self
+                    .package
+                    .get_or_create_part_rels("/word/fontTable.xml")
+                    .add(
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+                        &format!("fonts/font{}.odttf", i + 1),
+                    );
                 ft.push_str(&format!(
                     r#"<w:font w:name="{}"><w:embedRegular r:id="{}" w:fontKey="{{{}}}"/></w:font>"#,
                     xml_escape(name), rel_id, guid
@@ -281,7 +296,8 @@ impl Document {
             );
 
             ft.push_str("</w:fonts>");
-            self.package.set_part("/word/fontTable.xml", ft.into_bytes());
+            self.package
+                .set_part("/word/fontTable.xml", ft.into_bytes());
             self.package.content_types.add_override(
                 "/word/fontTable.xml",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
@@ -350,7 +366,9 @@ impl Document {
         // Serialize comments.xml if we have comments
         if !self.comments.is_empty() {
             // comments.xml — each comment paragraph carries a w14:paraId.
-            let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">"#);
+            let mut xml = String::from(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">"#,
+            );
             for c in &self.comments {
                 xml.push_str(&format!(
                     r#"<w:comment w:id="{}" w:author="{}" w:date="2026-01-01T00:00:00Z" w:initials=""><w:p w14:paraId="{}"><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:p></w:comment>"#,
@@ -361,14 +379,17 @@ impl Document {
                 ));
             }
             xml.push_str("</w:comments>");
-            self.package.set_part("/word/comments.xml", xml.into_bytes());
+            self.package
+                .set_part("/word/comments.xml", xml.into_bytes());
             self.package.content_types.add_override(
                 "/word/comments.xml",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
             );
 
             // commentsExtended.xml — threading (paraIdParent) and resolved (done).
-            let mut ext = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">"#);
+            let mut ext = String::from(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">"#,
+            );
             for c in &self.comments {
                 let parent_attr = c
                     .parent
@@ -383,7 +404,8 @@ impl Document {
                 ));
             }
             ext.push_str("</w15:commentsEx>");
-            self.package.set_part("/word/commentsExtended.xml", ext.into_bytes());
+            self.package
+                .set_part("/word/commentsExtended.xml", ext.into_bytes());
             self.package.content_types.add_override(
                 "/word/commentsExtended.xml",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
@@ -403,7 +425,9 @@ impl Document {
                     authors.push(&c.author);
                 }
             }
-            let mut ppl = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w15:people xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">"#);
+            let mut ppl = String::from(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w15:people xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml">"#,
+            );
             for a in &authors {
                 ppl.push_str(&format!(
                     r#"<w15:person w15:author="{a}"><w15:presenceInfo w15:providerId="None" w15:userId="{a}"/></w15:person>"#,
@@ -450,9 +474,14 @@ impl Document {
 
         // Glossary document (building blocks / Quick Parts).
         if !self.building_blocks.is_empty()
-            && self.package.get_part("/word/glossary/document.xml").is_none()
+            && self
+                .package
+                .get_part("/word/glossary/document.xml")
+                .is_none()
         {
-            let mut g = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:glossaryDocument xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docParts>"#);
+            let mut g = String::from(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:glossaryDocument xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docParts>"#,
+            );
             for (i, (name, content)) in self.building_blocks.iter().enumerate() {
                 let guid = format!("00000000-0000-0000-0000-{:012X}", i + 1);
                 g.push_str(&format!(
@@ -468,7 +497,8 @@ impl Document {
                 ));
             }
             g.push_str("</w:docParts></w:glossaryDocument>");
-            self.package.set_part("/word/glossary/document.xml", g.into_bytes());
+            self.package
+                .set_part("/word/glossary/document.xml", g.into_bytes());
             self.package.content_types.add_override(
                 "/word/glossary/document.xml",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml",
@@ -482,9 +512,7 @@ impl Document {
         }
 
         // Custom XML data parts (+ datastore itemProps for data binding).
-        if !self.custom_xml.is_empty()
-            && self.package.get_part("/customXml/item1.xml").is_none()
-        {
+        if !self.custom_xml.is_empty() && self.package.get_part("/customXml/item1.xml").is_none() {
             for (i, xml) in self.custom_xml.iter().enumerate() {
                 let n = i + 1;
                 let guid = format!("00000000-0000-0000-0000-{:012X}", n);
@@ -692,7 +720,9 @@ impl Document {
     /// Add a table with the specified number of rows and columns.
     /// Returns a mutable reference for further configuration.
     pub fn add_table(&mut self, rows: usize, cols: usize) -> Table<'_> {
-        use zavora_docx_oxml::table::{CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc};
+        use zavora_docx_oxml::table::{
+            CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc,
+        };
         use zavora_docx_oxml::units::Twips;
 
         // Default column width: divide 9360tw (6.5" printable at 1" margins) evenly
@@ -759,7 +789,9 @@ impl Document {
     /// Returns a mutable `Table` for further configuration.
     /// Panics if `index > content_count()`.
     pub fn insert_table(&mut self, index: usize, rows: usize, cols: usize) -> Table<'_> {
-        use zavora_docx_oxml::table::{CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc};
+        use zavora_docx_oxml::table::{
+            CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc,
+        };
         use zavora_docx_oxml::units::Twips;
 
         let col_width = Twips(9360 / cols as i32);
@@ -968,8 +1000,16 @@ impl Document {
             .as_ref()
             .cloned()
             .unwrap_or_else(CT_SectPr::default_letter);
-        let pw = sect.page_width.unwrap_or(zavora_docx_oxml::units::Twips(12240)).to_emu().0;
-        let ph = sect.page_height.unwrap_or(zavora_docx_oxml::units::Twips(15840)).to_emu().0;
+        let pw = sect
+            .page_width
+            .unwrap_or(zavora_docx_oxml::units::Twips(12240))
+            .to_emu()
+            .0;
+        let ph = sect
+            .page_height
+            .unwrap_or(zavora_docx_oxml::units::Twips(15840))
+            .to_emu()
+            .0;
 
         let anchor = CT_Anchor::background(&rel_id, pw, ph);
         let drawing = CT_Drawing::anchor(anchor);
@@ -1163,7 +1203,10 @@ impl Document {
                 .add(rel_types::HEADER, &format!("header{suffix}1.xml"));
             let sect = self.section_properties_mut();
             sect.header_refs.retain(|h| h.hdr_ftr_type != ty);
-            sect.header_refs.push(HdrFtrRef { hdr_ftr_type: ty, rel_id });
+            sect.header_refs.push(HdrFtrRef {
+                hdr_ftr_type: ty,
+                rel_id,
+            });
         };
 
         if verso == recto {
@@ -1184,7 +1227,7 @@ impl Document {
     /// Set a footer with a centered page number field.
     pub fn set_footer_page_number(&mut self) {
         use zavora_docx_opc::relationship::rel_types;
-        use zavora_docx_oxml::text::{CT_R, RunContent, FieldType};
+        use zavora_docx_oxml::text::{CT_R, FieldType, RunContent};
 
         let mut hdr_ftr = CT_HdrFtr::new();
         let mut p = CT_P::new();
@@ -1196,24 +1239,35 @@ impl Document {
 
         // Add a run with PAGE field
         let mut run = CT_R::new("");
-        run.content = vec![RunContent::Field { field_type: FieldType::Page }];
+        run.content = vec![RunContent::Field {
+            field_type: FieldType::Page,
+        }];
         p.runs.push(run);
 
         hdr_ftr.paragraphs.push(p);
 
         let part_name = "/word/footer1.xml";
-        let xml = hdr_ftr.to_xml_footer().expect("footer serialization failed");
+        let xml = hdr_ftr
+            .to_xml_footer()
+            .expect("footer serialization failed");
 
         self.package.set_part(part_name, xml);
-        self.package.content_types.add_override(part_name, "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml");
+        self.package.content_types.add_override(
+            part_name,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml",
+        );
 
         let rel_target = "footer1.xml";
         let rels = self.package.get_or_create_part_rels(&self.doc_part_name);
         let rel_id = rels.add(rel_types::FOOTER, rel_target);
 
         let sect = self.section_properties_mut();
-        sect.footer_refs.retain(|r| r.hdr_ftr_type != HdrFtrType::Default);
-        sect.footer_refs.push(HdrFtrRef { hdr_ftr_type: HdrFtrType::Default, rel_id });
+        sect.footer_refs
+            .retain(|r| r.hdr_ftr_type != HdrFtrType::Default);
+        sect.footer_refs.push(HdrFtrRef {
+            hdr_ftr_type: HdrFtrType::Default,
+            rel_id,
+        });
     }
 
     /// Set the first-page header text.
@@ -1849,7 +1903,13 @@ impl Document {
     /// Add a list item with custom numbering format.
     /// `format`: "decimal", "upperRoman", "lowerRoman", "upperLetter", "lowerLetter", "bullet".
     /// `bullet_char`: custom bullet character (only used when format is "bullet"), e.g. "→", "★", "◆".
-    pub fn add_custom_list_item(&mut self, text: &str, level: u32, format: &str, bullet_char: Option<&str>) -> Paragraph<'_> {
+    pub fn add_custom_list_item(
+        &mut self,
+        text: &str,
+        level: u32,
+        format: &str,
+        bullet_char: Option<&str>,
+    ) -> Paragraph<'_> {
         use zavora_docx_oxml::numbering::ST_NumberFormat;
         let fmt = match format {
             "upperRoman" => ST_NumberFormat::UpperRoman,
@@ -1877,18 +1937,31 @@ impl Document {
             abs.levels.push(lvl);
             numbering.abstract_nums.push(abs);
             let nid = numbering.next_num_id();
-            numbering.nums.push(zavora_docx_oxml::numbering::CT_Num { num_id: nid, abstract_num_id: abs_id, extra_xml: Vec::new() });
+            numbering.nums.push(zavora_docx_oxml::numbering::CT_Num {
+                num_id: nid,
+                abstract_num_id: abs_id,
+                extra_xml: Vec::new(),
+            });
             nid
         };
 
         let mut p = zavora_docx_oxml::text::CT_P::new();
-        if !text.is_empty() { p.add_run(text); }
+        if !text.is_empty() {
+            p.add_run(text);
+        }
         p.properties = Some(zavora_docx_oxml::properties::CT_PPr {
-            num_id: Some(num_id), num_ilvl: Some(level), ..Default::default()
+            num_id: Some(num_id),
+            num_ilvl: Some(level),
+            ..Default::default()
         });
-        self.document.body.content.push(zavora_docx_oxml::document::BodyContent::Paragraph(p));
+        self.document
+            .body
+            .content
+            .push(zavora_docx_oxml::document::BodyContent::Paragraph(p));
         match self.document.body.content.last_mut().unwrap() {
-            zavora_docx_oxml::document::BodyContent::Paragraph(p) => crate::paragraph::Paragraph { inner: p },
+            zavora_docx_oxml::document::BodyContent::Paragraph(p) => {
+                crate::paragraph::Paragraph { inner: p }
+            }
             _ => unreachable!(),
         }
     }
@@ -2192,8 +2265,7 @@ impl Document {
     }
 
     fn ensure_app_properties(&mut self) -> &mut zavora_docx_oxml::app_properties::AppProperties {
-        self.app_properties
-            .get_or_insert_with(Default::default)
+        self.app_properties.get_or_insert_with(Default::default)
     }
 
     /// Set the authoring application name (docProps/app.xml).
@@ -2210,13 +2282,15 @@ impl Document {
     /// raw TTF/OTF bytes; `family` is the font name as referenced in styles.
     /// Stored obfuscated (.odttf) per the OOXML embedded-font scheme.
     pub fn embed_font(&mut self, family: &str, data: &[u8]) {
-        self.embedded_fonts.push((family.to_string(), data.to_vec()));
+        self.embedded_fonts
+            .push((family.to_string(), data.to_vec()));
     }
 
     /// Add a reusable building block (Quick Part) by name with plain-text
     /// content, stored in the glossary document.
     pub fn add_building_block(&mut self, name: &str, content: &str) {
-        self.building_blocks.push((name.to_string(), content.to_string()));
+        self.building_blocks
+            .push((name.to_string(), content.to_string()));
     }
 
     /// Attach a custom XML data part (arbitrary XML) to the document, with a
@@ -2276,7 +2350,14 @@ impl Document {
         }
     }
 
-    fn push_comment(&mut self, id: u32, author: &str, text: &str, parent: Option<u32>, resolved: bool) {
+    fn push_comment(
+        &mut self,
+        id: u32,
+        author: &str,
+        text: &str,
+        parent: Option<u32>,
+        resolved: bool,
+    ) {
         if self.comments.is_empty() {
             // Register the comments relationship once.
             self.package
@@ -2316,10 +2397,15 @@ impl Document {
         xml.push_str("\"/><w10:wrap anchorx=\"margin\" anchory=\"margin\"/></v:shape>");
         xml.push_str("</w:pict></w:r></w:p></w:hdr>");
 
-        let rel_id = self.package
+        let rel_id = self
+            .package
             .get_or_create_part_rels(&self.doc_part_name)
-            .add(zavora_docx_opc::relationship::rel_types::HEADER, "header_watermark.xml");
-        self.package.set_part("/word/header_watermark.xml", xml.into_bytes());
+            .add(
+                zavora_docx_opc::relationship::rel_types::HEADER,
+                "header_watermark.xml",
+            );
+        self.package
+            .set_part("/word/header_watermark.xml", xml.into_bytes());
         self.package.content_types.add_override(
             "/word/header_watermark.xml",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
@@ -2327,7 +2413,9 @@ impl Document {
 
         let sect_pr = self.section_properties_mut();
         use zavora_docx_oxml::header_footer::{HdrFtrRef, HdrFtrType};
-        sect_pr.header_refs.retain(|h| h.hdr_ftr_type != HdrFtrType::Default);
+        sect_pr
+            .header_refs
+            .retain(|h| h.hdr_ftr_type != HdrFtrType::Default);
         sect_pr.header_refs.push(HdrFtrRef {
             hdr_ftr_type: HdrFtrType::Default,
             rel_id,
@@ -2341,13 +2429,21 @@ impl Document {
             // Ensure relationship exists
             self.package
                 .get_or_create_part_rels(&self.doc_part_name)
-                .add(zavora_docx_opc::relationship::rel_types::FOOTNOTES, "footnotes.xml");
+                .add(
+                    zavora_docx_opc::relationship::rel_types::FOOTNOTES,
+                    "footnotes.xml",
+                );
             zavora_docx_oxml::footnotes::CT_Footnotes::new()
         });
         let id = footnotes.footnotes.iter().map(|f| f.id).max().unwrap_or(0) + 1;
         let mut para = zavora_docx_oxml::text::CT_P::new();
         para.add_run(text);
-        footnotes.footnotes.push(zavora_docx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
+        footnotes
+            .footnotes
+            .push(zavora_docx_oxml::footnotes::CT_Footnote {
+                id,
+                paragraphs: vec![para],
+            });
         id
     }
 
@@ -2356,34 +2452,64 @@ impl Document {
         let endnotes = self.endnotes.get_or_insert_with(|| {
             self.package
                 .get_or_create_part_rels(&self.doc_part_name)
-                .add(zavora_docx_opc::relationship::rel_types::ENDNOTES, "endnotes.xml");
+                .add(
+                    zavora_docx_opc::relationship::rel_types::ENDNOTES,
+                    "endnotes.xml",
+                );
             zavora_docx_oxml::footnotes::CT_Footnotes::new()
         });
         let id = endnotes.footnotes.iter().map(|f| f.id).max().unwrap_or(0) + 1;
         let mut para = zavora_docx_oxml::text::CT_P::new();
         para.add_run(text);
-        endnotes.footnotes.push(zavora_docx_oxml::footnotes::CT_Footnote { id, paragraphs: vec![para] });
+        endnotes
+            .footnotes
+            .push(zavora_docx_oxml::footnotes::CT_Footnote {
+                id,
+                paragraphs: vec![para],
+            });
         id
     }
 
     /// Get all footnotes as (id, text) pairs.
     pub fn footnotes_list(&self) -> Vec<(i32, String)> {
-        self.footnotes.as_ref().map(|fns| {
-            fns.footnotes.iter().map(|f| {
-                let text = f.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>().join("\n");
-                (f.id, text)
-            }).collect()
-        }).unwrap_or_default()
+        self.footnotes
+            .as_ref()
+            .map(|fns| {
+                fns.footnotes
+                    .iter()
+                    .map(|f| {
+                        let text = f
+                            .paragraphs
+                            .iter()
+                            .map(|p| p.text())
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        (f.id, text)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Get all endnotes as (id, text) pairs.
     pub fn endnotes_list(&self) -> Vec<(i32, String)> {
-        self.endnotes.as_ref().map(|ens| {
-            ens.footnotes.iter().map(|f| {
-                let text = f.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>().join("\n");
-                (f.id, text)
-            }).collect()
-        }).unwrap_or_default()
+        self.endnotes
+            .as_ref()
+            .map(|ens| {
+                ens.footnotes
+                    .iter()
+                    .map(|f| {
+                        let text = f
+                            .paragraphs
+                            .iter()
+                            .map(|p| p.text())
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        (f.id, text)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Protect the document as read-only.
@@ -2423,27 +2549,36 @@ impl Document {
             r#"<w:lnNumType w:countBy="{}" w:restart="{}" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
             count_by, restart
         );
-        self.section_properties_mut().extra_xml.push(xml.into_bytes());
+        self.section_properties_mut()
+            .extra_xml
+            .push(xml.into_bytes());
     }
 
     /// Set the document theme colors and fonts. Creates/replaces word/theme/theme1.xml.
     pub fn set_theme(&mut self, colors: &[(&str, &str)], major_font: &str, minor_font: &str) {
         let mut color_xml = String::new();
         for (name, hex) in colors {
-            color_xml.push_str(&format!(r#"<a:{} lastClr="{}"><a:srgbClr val="{}"/></a:{}>"#, name, hex, hex, name));
+            color_xml.push_str(&format!(
+                r#"<a:{} lastClr="{}"><a:srgbClr val="{}"/></a:{}>"#,
+                name, hex, hex, name
+            ));
         }
         let xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Custom Theme"><a:themeElements><a:clrScheme name="Custom">{}</a:clrScheme><a:fontScheme name="Custom"><a:majorFont><a:latin typeface="{}"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="{}"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Custom"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>"#,
             color_xml, major_font, minor_font
         );
-        self.package.set_part("/word/theme/theme1.xml", xml.into_bytes());
+        self.package
+            .set_part("/word/theme/theme1.xml", xml.into_bytes());
         self.package.content_types.add_override(
             "/word/theme/theme1.xml",
             "application/vnd.openxmlformats-officedocument.theme+xml",
         );
         self.package
             .get_or_create_part_rels(&self.doc_part_name)
-            .add("http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme", "theme/theme1.xml");
+            .add(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+                "theme/theme1.xml",
+            );
     }
 
     // ---- Document Merging ----
@@ -2525,13 +2660,13 @@ impl Document {
             return;
         };
 
-        let numbering = self
-            .numbering
-            .get_or_insert_with(|| zavora_docx_oxml::numbering::CT_Numbering {
-                abstract_nums: Vec::new(),
-                nums: Vec::new(),
-                extra_xml: Vec::new(),
-            });
+        let numbering =
+            self.numbering
+                .get_or_insert_with(|| zavora_docx_oxml::numbering::CT_Numbering {
+                    abstract_nums: Vec::new(),
+                    nums: Vec::new(),
+                    extra_xml: Vec::new(),
+                });
 
         // Find max existing IDs to avoid collision
         let max_abstract_id = numbering
@@ -3041,7 +3176,8 @@ impl Document {
         Ok(serde_json::json!({
             "pages": layout.pages,
             "fonts": layout.fonts,
-        }).to_string())
+        })
+        .to_string())
     }
 
     /// Render the document to PDF bytes.
@@ -3107,7 +3243,10 @@ impl Document {
         let input = self.build_html_input();
         zavora_docx_html::to_html_fragment(
             &input,
-            &zavora_docx_html::HtmlOptions { inline_images: true, editable: true },
+            &zavora_docx_html::HtmlOptions {
+                inline_images: true,
+                editable: true,
+            },
         )
     }
 
@@ -3135,7 +3274,9 @@ impl Document {
 
     /// Render the (default) header or footer part to an HTML fragment, or "" if none.
     fn hdrftr_html(&self, rel_type: &str) -> String {
-        let Some(rels) = self.package.get_part_rels(&self.doc_part_name) else { return String::new() };
+        let Some(rels) = self.package.get_part_rels(&self.doc_part_name) else {
+            return String::new();
+        };
         for rel in &rels.items {
             if rel.rel_type == rel_type {
                 let part = OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
@@ -3144,9 +3285,13 @@ impl Document {
                 {
                     let mut body = zavora_docx_oxml::document::CT_Body::new();
                     for p in hf.paragraphs {
-                        body.content.push(zavora_docx_oxml::document::BodyContent::Paragraph(p));
+                        body.content
+                            .push(zavora_docx_oxml::document::BodyContent::Paragraph(p));
                     }
-                    let doc = CT_Document { body, ..Default::default() };
+                    let doc = CT_Document {
+                        body,
+                        ..Default::default()
+                    };
                     let input = zavora_docx_html::HtmlInput {
                         document: doc,
                         styles: self.styles.clone(),
@@ -3154,7 +3299,10 @@ impl Document {
                         images: std::collections::HashMap::new(),
                         hyperlink_urls: std::collections::HashMap::new(),
                     };
-                    return zavora_docx_html::to_html_fragment(&input, &zavora_docx_html::HtmlOptions::default());
+                    return zavora_docx_html::to_html_fragment(
+                        &input,
+                        &zavora_docx_html::HtmlOptions::default(),
+                    );
                 }
             }
         }
@@ -3193,8 +3341,8 @@ impl Document {
 
     /// Build an HtmlInput from the document's current state.
     fn build_html_input(&self) -> zavora_docx_html::HtmlInput {
-        use zavora_docx_opc::relationship::rel_types;
         use std::collections::HashMap;
+        use zavora_docx_opc::relationship::rel_types;
 
         let mut images: HashMap<String, zavora_docx_html::ImageData> = HashMap::new();
         let mut hyperlink_urls: HashMap<String, String> = HashMap::new();
@@ -3243,7 +3391,9 @@ impl Document {
     pub fn render_page_to_png(&self, page_index: usize, dpi: f64) -> Result<Option<Vec<u8>>> {
         let input = self.build_layout_input();
         let layout = zavora_docx_layout::layout_document(&input)?;
-        Ok(zavora_docx_pdf::render_page_to_png(&layout, page_index, dpi))
+        Ok(zavora_docx_pdf::render_page_to_png(
+            &layout, page_index, dpi,
+        ))
     }
 
     /// Render all pages of the document to PNG bytes.
@@ -3303,7 +3453,10 @@ impl Document {
     pub fn image_by_embed_id(&self, embed_id: &str) -> Option<(Vec<u8>, String)> {
         use zavora_docx_opc::relationship::rel_types;
         let rels = self.package.get_part_rels(&self.doc_part_name)?;
-        let rel = rels.items.iter().find(|r| r.id == embed_id && r.rel_type == rel_types::IMAGE)?;
+        let rel = rels
+            .items
+            .iter()
+            .find(|r| r.id == embed_id && r.rel_type == rel_types::IMAGE)?;
         let part_name = OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
         let data = self.package.get_part(&part_name)?;
         Some((data.to_vec(), guess_image_content_type(&part_name)))
@@ -3311,9 +3464,9 @@ impl Document {
 
     /// Build a LayoutInput from the document's current state.
     fn build_layout_input(&self) -> zavora_docx_layout::LayoutInput {
+        use std::collections::HashMap;
         use zavora_docx_layout::{ImageData, LayoutInput};
         use zavora_docx_opc::relationship::rel_types;
-        use std::collections::HashMap;
 
         let mut headers: HashMap<String, CT_HdrFtr> = HashMap::new();
         let mut footers: HashMap<String, CT_HdrFtr> = HashMap::new();
@@ -3369,14 +3522,16 @@ impl Document {
                         let part_name =
                             OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
                         if let Some(xml) = self.package.get_part(&part_name) {
-                            footnotes = zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
+                            footnotes =
+                                zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
                         }
                     }
                     t if t == rel_types::ENDNOTES => {
                         let part_name =
                             OpcPackage::resolve_rel_target(&self.doc_part_name, &rel.target);
                         if let Some(xml) = self.package.get_part(&part_name) {
-                            endnotes = zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
+                            endnotes =
+                                zavora_docx_oxml::footnotes::CT_Footnotes::from_xml(xml).ok();
                         }
                     }
                     _ => {}
@@ -4635,12 +4790,20 @@ mod tests {
         doc.add_custom_xml(r#"<root><item key="a">1</item></root>"#);
         let bytes = doc.to_bytes().expect("serialize");
         let reopened = Document::from_bytes(&bytes).expect("reopen");
-        let g = reopened.package.get_part("/word/glossary/document.xml").expect("glossary");
+        let g = reopened
+            .package
+            .get_part("/word/glossary/document.xml")
+            .expect("glossary");
         let gs = String::from_utf8(g.to_vec()).unwrap();
         assert!(gs.contains(r#"w:val="Disclaimer""#), "block name: {gs}");
         assert!(gs.contains("All rights reserved."), "block body: {gs}");
         assert!(reopened.package.get_part("/customXml/item1.xml").is_some());
-        assert!(reopened.package.get_part("/customXml/itemProps1.xml").is_some());
+        assert!(
+            reopened
+                .package
+                .get_part("/customXml/itemProps1.xml")
+                .is_some()
+        );
     }
 
     #[test]
@@ -4652,7 +4815,8 @@ mod tests {
         assert_ne!(&obf[..32], &font[..32]);
         assert_eq!(&obf[32..], &font[32..]);
         // Deobfuscate (file-name form) restores the original.
-        let restored = deobfuscate_odttf(&obf, "00000000-0000-0000-0000-000000000001.odttf").unwrap();
+        let restored =
+            deobfuscate_odttf(&obf, "00000000-0000-0000-0000-000000000001.odttf").unwrap();
         assert_eq!(restored, font);
     }
 
@@ -4664,7 +4828,12 @@ mod tests {
         let bytes = doc.to_bytes().expect("serialize");
         let reopened = Document::from_bytes(&bytes).expect("reopen");
         // The obfuscated font part must be present after round-trip.
-        assert!(reopened.package.get_part("/word/fonts/font1.odttf").is_some());
+        assert!(
+            reopened
+                .package
+                .get_part("/word/fonts/font1.odttf")
+                .is_some()
+        );
     }
 
     #[test]
@@ -4679,8 +4848,7 @@ mod tests {
         // Re-open to confirm the package is structurally sound.
         let _ = Document::from_bytes(&bytes).expect("open");
         // Inspect the commentsExtended part via a fresh package read.
-        let pkg = OpcPackage::from_reader(std::io::Cursor::new(&bytes))
-            .expect("pkg");
+        let pkg = OpcPackage::from_reader(std::io::Cursor::new(&bytes)).expect("pkg");
         let ext = pkg
             .get_part("/word/commentsExtended.xml")
             .expect("commentsExtended part");
@@ -4706,10 +4874,7 @@ mod tests {
         let reopened = Document::from_bytes(&bytes).expect("open");
         assert!(reopened.settings.mirror_margins);
         assert_eq!(reopened.settings.zoom_percent, Some(140));
-        assert_eq!(
-            reopened.settings.default_tab_stop.map(|t| t.0),
-            Some(720)
-        );
+        assert_eq!(reopened.settings.default_tab_stop.map(|t| t.0), Some(720));
         assert_eq!(
             reopened.settings.theme_font_lang.unwrap().val.as_deref(),
             Some("fr-FR")

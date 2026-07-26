@@ -12,7 +12,10 @@ pub struct CT_Bookmark {
 
 impl CT_Bookmark {
     pub fn new(id: u32, name: impl Into<String>) -> Self {
-        CT_Bookmark { id, name: name.into() }
+        CT_Bookmark {
+            id,
+            name: name.into(),
+        }
     }
 
     /// `<w:bookmarkStart .../>` element bytes.
@@ -54,7 +57,10 @@ mod tests {
     fn bookmark_xml() {
         let b = CT_Bookmark::new(1, "chap1");
         let s = String::from_utf8(b.start_xml()).unwrap();
-        assert!(s.contains(r#"w:id="1""#) && s.contains(r#"w:name="chap1""#), "{s}");
+        assert!(
+            s.contains(r#"w:id="1""#) && s.contains(r#"w:name="chap1""#),
+            "{s}"
+        );
         let e = String::from_utf8(b.end_xml()).unwrap();
         assert!(e.contains("bookmarkEnd"), "{e}");
         let r = String::from_utf8(b.cross_reference_xml()).unwrap();

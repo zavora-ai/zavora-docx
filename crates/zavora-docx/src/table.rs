@@ -171,9 +171,12 @@ impl<'a> Table<'a> {
         if let Some(row) = self.inner.rows.first_mut() {
             row.properties.get_or_insert_with(Default::default).header = Some(true);
             for cell in &mut row.cells {
-                cell.properties.get_or_insert_with(Default::default).shading = Some(zavora_docx_oxml::properties::CT_Shd {
-                    val: "clear".to_string(), color: Some("auto".to_string()), fill: Some(bg_color.to_string()),
-                });
+                cell.properties.get_or_insert_with(Default::default).shading =
+                    Some(zavora_docx_oxml::properties::CT_Shd {
+                        val: "clear".to_string(),
+                        color: Some("auto".to_string()),
+                        fill: Some(bg_color.to_string()),
+                    });
                 for content in &mut cell.content {
                     if let zavora_docx_oxml::table::CellContent::Paragraph(p) = content {
                         for run in &mut p.runs {
@@ -195,7 +198,9 @@ impl<'a> Table<'a> {
             row.cells.push(CT_Tc::new());
         }
         self.inner.rows.push(row);
-        Row { inner: self.inner.rows.last_mut().unwrap() }
+        Row {
+            inner: self.inner.rows.last_mut().unwrap(),
+        }
     }
 
     /// Get a mutable reference to a row by index.

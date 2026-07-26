@@ -5,8 +5,7 @@ use quick_xml::{Reader, Writer};
 
 use crate::error::Result;
 
-const NS: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
+const NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
 
 /// Extended properties (`docProps/app.xml`).
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -64,7 +63,11 @@ impl AppProperties {
 
     pub fn to_xml(&self) -> Result<Vec<u8>> {
         let mut w = Writer::new(Vec::new());
-        w.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), Some("yes"))))?;
+        w.write_event(Event::Decl(BytesDecl::new(
+            "1.0",
+            Some("UTF-8"),
+            Some("yes"),
+        )))?;
         let mut root = BytesStart::new("Properties");
         root.push_attribute(("xmlns", NS));
         w.write_event(Event::Start(root))?;

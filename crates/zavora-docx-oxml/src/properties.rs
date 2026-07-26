@@ -154,16 +154,26 @@ impl CT_PPr {
                         let mut b2 = Vec::new();
                         loop {
                             match reader.read_event_into(&mut b2)? {
-                                Event::Start(ref ie) if matches_local_name(ie.name().as_ref(), b"pPr") => {
+                                Event::Start(ref ie)
+                                    if matches_local_name(ie.name().as_ref(), b"pPr") =>
+                                {
                                     prev = CT_PPr::from_xml(reader)?;
                                 }
-                                Event::End(ref ie) if matches_local_name(ie.name().as_ref(), b"pPrChange") => break,
+                                Event::End(ref ie)
+                                    if matches_local_name(ie.name().as_ref(), b"pPrChange") =>
+                                {
+                                    break;
+                                }
                                 Event::Eof => break,
                                 _ => {}
                             }
                             b2.clear();
                         }
-                        ppr.ppr_change = Some(Box::new(PPrChange { author, date, previous: Box::new(prev) }));
+                        ppr.ppr_change = Some(Box::new(PPrChange {
+                            author,
+                            date,
+                            previous: Box::new(prev),
+                        }));
                     } else {
                         let raw = crate::raw_xml::capture_element(reader, e)?;
                         ppr.extra_xml.get_or_insert_with(Vec::new).push(raw);
@@ -740,16 +750,26 @@ impl CT_RPr {
                         let mut b2 = Vec::new();
                         loop {
                             match reader.read_event_into(&mut b2)? {
-                                Event::Start(ref ie) if matches_local_name(ie.name().as_ref(), b"rPr") => {
+                                Event::Start(ref ie)
+                                    if matches_local_name(ie.name().as_ref(), b"rPr") =>
+                                {
                                     prev = CT_RPr::from_xml(reader)?;
                                 }
-                                Event::End(ref ie) if matches_local_name(ie.name().as_ref(), b"rPrChange") => break,
+                                Event::End(ref ie)
+                                    if matches_local_name(ie.name().as_ref(), b"rPrChange") =>
+                                {
+                                    break;
+                                }
                                 Event::Eof => break,
                                 _ => {}
                             }
                             b2.clear();
                         }
-                        rpr.rpr_change = Some(Box::new(RPrChange { author, date, previous: Box::new(prev) }));
+                        rpr.rpr_change = Some(Box::new(RPrChange {
+                            author,
+                            date,
+                            previous: Box::new(prev),
+                        }));
                     } else {
                         let raw = crate::raw_xml::capture_element(reader, e)?;
                         rpr.extra_xml.get_or_insert_with(Vec::new).push(raw);
@@ -1177,7 +1197,9 @@ mod tests {
     #[test]
     fn track_change_revisions_round_trip() {
         // rPrChange carries the previous run props (bold).
-        let rpr = parse_rpr(r#"<w:i/><w:rPrChange w:author="Ed" w:date="2024-01-01T00:00:00Z"><w:rPr><w:b/></w:rPr></w:rPrChange>"#);
+        let rpr = parse_rpr(
+            r#"<w:i/><w:rPrChange w:author="Ed" w:date="2024-01-01T00:00:00Z"><w:rPr><w:b/></w:rPr></w:rPrChange>"#,
+        );
         assert_eq!(rpr.italic, Some(true));
         let ch = rpr.rpr_change.as_ref().expect("rpr_change parsed");
         assert_eq!(ch.author, "Ed");
@@ -1191,7 +1213,8 @@ mod tests {
     #[test]
     fn rpr_preserves_unknown_elements() {
         // w:lang and w:em aren't typed fields — must round-trip via extra_xml.
-        let rpr = parse_rpr(r#"<w:b/><w:lang w:val="en-US" w:eastAsia="ja-JP"/><w:em w:val="dot"/>"#);
+        let rpr =
+            parse_rpr(r#"<w:b/><w:lang w:val="en-US" w:eastAsia="ja-JP"/><w:em w:val="dot"/>"#);
         assert_eq!(rpr.bold, Some(true));
         let out = rpr_to_string(&rpr);
         assert!(out.contains(r#"w:val="en-US""#), "lang lost: {out}");
@@ -1207,7 +1230,10 @@ mod tests {
         assert_eq!(ppr.jc, Some(ST_Jc::Both));
         let out = ppr_to_string(&ppr);
         assert!(out.contains("w:rPrChange"), "rPrChange lost: {out}");
-        assert!(out.contains(r#"w:author="A""#), "revision attrs lost: {out}");
+        assert!(
+            out.contains(r#"w:author="A""#),
+            "revision attrs lost: {out}"
+        );
     }
 
     #[test]
