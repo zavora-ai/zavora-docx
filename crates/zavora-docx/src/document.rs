@@ -3285,6 +3285,35 @@ impl Document {
         )
     }
 
+    /// The same editable view, with the pictures referenced rather than carried.
+    ///
+    /// Each image becomes `<img data-media="rIdN">` and the caller fetches the bytes with
+    /// [`Document::media`]. For a document of any size this is the difference between a payload an
+    /// interface can hold and one it cannot: a 200MB manuscript inlines to about 290MB of base64,
+    /// which has to cross a channel, be parsed, and become a page.
+    pub fn to_editable_html_referencing_images(&self) -> String {
+        let input = self.build_html_input();
+        zavora_docx_html::to_html_fragment(
+            &input,
+            &zavora_docx_html::HtmlOptions {
+                inline_images: false,
+                editable: true,
+            },
+        )
+    }
+
+    /// The bytes of one embedded image, and what kind it is.
+    ///
+    /// Keyed by the relationship id the referencing view emits, so a caller can serve exactly what
+    /// the page asked for and nothing else.
+    pub fn media(&self, embed_id: &str) -> Option<(String, Vec<u8>)> {
+        let input = self.build_html_input();
+        input
+            .images
+            .get(embed_id)
+            .map(|image| (image.content_type.clone(), image.data.clone()))
+    }
+
     /// Page geometry (CSS pixels @96dpi) + rendered header/footer HTML, for a
     /// paginated edit view. The body is rendered separately via
     /// `to_editable_html` and laid into the page boxes by the client.

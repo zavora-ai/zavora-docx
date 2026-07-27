@@ -361,19 +361,27 @@ fn emit_run(
                 BreakType::Column => out.push_str("<hr class=\"column-break\">"),
             },
             RunContent::Drawing(drawing) => {
-                if options.inline_images {
-                    // Try to find image data
-                    let embed_id = drawing
-                        .inline
-                        .as_ref()
-                        .map(|i| i.embed_id.as_str())
-                        .or_else(|| drawing.anchor.as_ref().map(|a| a.embed_id.as_str()));
+                let embed_id = drawing
+                    .inline
+                    .as_ref()
+                    .map(|i| i.embed_id.as_str())
+                    .or_else(|| drawing.anchor.as_ref().map(|a| a.embed_id.as_str()));
 
+                if options.inline_images {
                     if let Some(eid) = embed_id
                         && let Some(img_data) = images.get(eid)
                     {
                         emit_image(out, img_data);
                     }
+                } else if let Some(eid) = embed_id {
+                    // Not inlining used to mean emitting nothing at all, so the choice was
+                    // between a payload carrying every image as base64 — a 200MB manuscript
+                    // becomes a 290MB payload — and a document with its pictures missing.
+                    // A reference is the third answer: the host fetches the bytes itself.
+                    out.push_str(&format!(
+                        "<img data-media=\"{}\" alt=\"\" style=\"max-width:100%\">",
+                        escape_html_attr(eid)
+                    ));
                 }
             }
             RunContent::Field { .. }
