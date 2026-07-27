@@ -223,6 +223,23 @@ fn emit_paragraph(
 }
 
 /// Emit the inner content of a paragraph (runs and hyperlinks).
+/// The readable text inside an equation: the contents of its `m:t` elements, in order.
+///
+/// Deliberately shallow. A full reading of Office maths would be a typesetter, and the point here
+/// is that the User sees the formula that is in their document rather than a blank line.
+fn math_text(xml: &str) -> String {
+    let mut text = String::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<m:t") {
+        rest = &rest[at..];
+        let Some(open) = rest.find('>') else { break };
+        let Some(close) = rest[open..].find("</m:t>") else { break };
+        text.push_str(&rest[open + 1..open + close]);
+        rest = &rest[open + close..];
+    }
+    text
+}
+
 fn emit_paragraph_content(
     out: &mut String,
     para: &CT_P,
@@ -240,6 +257,24 @@ fn emit_paragraph_content(
             for i in hl.run_start..hl.run_end {
                 hyperlink_map.insert(i, url);
             }
+        }
+    }
+
+    // Equations. They are kept in the file as the XML they arrived as, which is right for
+    // fidelity and meant they were invisible on screen: a paragraph holding a formula was drawn
+    // as an empty line. Their text is shown, marked as a formula, rather than typeset — showing
+    // "E = mc²" is honest, and pretending to lay out mathematics would not be.
+    for (_, raw) in &para.extra_xml {
+        let xml = String::from_utf8_lossy(raw);
+        if !xml.contains("oMath") {
+            continue;
+        }
+        let text = math_text(&xml);
+        if !text.is_empty() {
+            out.push_str(&format!(
+                "<span class=\"formula\">{}</span>",
+                escape_html(&text)
+            ));
         }
     }
 
