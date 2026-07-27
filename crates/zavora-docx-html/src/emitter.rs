@@ -43,6 +43,17 @@ pub(crate) fn emit_body(
                     }
                 }
 
+                // A bulleted item following a numbered one at the same level is a different list.
+                // Without this the two were folded together and the bullet was drawn as the next
+                // number — a document showing a bullet read as "3." on screen.
+                if let Some((is_ordered, level)) = &list_info
+                    && let Some(top) = list_stack.last()
+                    && top.ordered != *is_ordered
+                    && top.level == *level
+                {
+                    close_list(&mut out, &mut list_stack);
+                }
+
                 if let Some((is_ordered, level)) = list_info {
                     // Open new list levels if needed
                     let current_depth = list_stack.len() as u32;
@@ -309,8 +320,10 @@ fn emit_run(
             }
             RunContent::Break(bt) => match bt {
                 BreakType::Line => out.push_str("<br>"),
-                BreakType::Page => out.push_str("<hr>"),
-                BreakType::Column => out.push_str("<br>"),
+                // Named, so an interface can say "page break" rather than drawing a line the
+                // User cannot tell from a horizontal rule they put there themselves.
+                BreakType::Page => out.push_str("<hr class=\"page-break\">"),
+                BreakType::Column => out.push_str("<hr class=\"column-break\">"),
             },
             RunContent::Drawing(drawing) => {
                 if options.inline_images {
