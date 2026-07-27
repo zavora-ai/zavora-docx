@@ -831,6 +831,41 @@ impl Document {
     /// Remove the content at the given body index.
     ///
     /// Returns `true` if an element was removed, `false` if the index was out of bounds.
+    /// Replace the words of the paragraph at `index` in the body's content, keeping everything
+    /// about it that is not words.
+    ///
+    /// The obvious way — remove the content and insert a plain paragraph — is what the capability
+    /// server did, and it turned a heading into body text: the new words arrived and the style,
+    /// the numbering and the run formatting went with the old ones. Editing the text of a heading
+    /// should leave a heading.
+    ///
+    /// The first run's formatting is kept and carries the new text; any further runs go, because
+    /// the caller has replaced the whole paragraph's words and there is nothing left for them to
+    /// format. Returns false when `index` is not a paragraph — a table is not a paragraph, and
+    /// replacing one with text would delete it.
+    pub fn set_paragraph_text(&mut self, index: usize, text: &str) -> bool {
+        use zavora_docx_oxml::document::BodyContent;
+
+        let Some(content) = self.document.body.content.get_mut(index) else {
+            return false;
+        };
+        let BodyContent::Paragraph(paragraph) = content else {
+            return false;
+        };
+
+        // Keep the first run whole and give it the new words, so bold body text stays bold and a
+        // heading stays a heading.
+        use zavora_docx_oxml::text::{CT_R, CT_Text, RunContent};
+
+        if let Some(first) = paragraph.runs.first_mut() {
+            first.content = vec![RunContent::Text(CT_Text::new(text))];
+            paragraph.runs.truncate(1);
+        } else {
+            paragraph.runs.push(CT_R::new(text));
+        }
+        true
+    }
+
     pub fn remove_content(&mut self, index: usize) -> bool {
         self.document.body.remove(index).is_some()
     }
