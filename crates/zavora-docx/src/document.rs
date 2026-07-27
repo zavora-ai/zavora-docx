@@ -3314,6 +3314,23 @@ impl Document {
             .map(|image| (image.content_type.clone(), image.data.clone()))
     }
 
+    /// Every embedded picture, by the relationship id the referencing view emits.
+    ///
+    /// For a caller serving a page's pictures one request at a time: taking them all at once costs
+    /// one read of the file instead of one per picture, and a book has hundreds.
+    pub fn all_media(&self) -> std::collections::HashMap<String, (String, Vec<u8>)> {
+        self.build_html_input()
+            .images
+            .iter()
+            .map(|(id, image)| {
+                (
+                    id.clone(),
+                    (image.content_type.clone(), image.data.clone()),
+                )
+            })
+            .collect()
+    }
+
     /// Page geometry (CSS pixels @96dpi) + rendered header/footer HTML, for a
     /// paginated edit view. The body is rendered separately via
     /// `to_editable_html` and laid into the page boxes by the client.
