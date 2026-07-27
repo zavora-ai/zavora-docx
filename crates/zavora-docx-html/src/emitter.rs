@@ -384,6 +384,12 @@ fn emit_run(
                     ));
                 }
             }
+            // Where the page ended when this document was last laid out. Marked apart from an
+            // author's own page break: one is a record, the other an instruction, and an interface
+            // showing pages wants both.
+            RunContent::LastRenderedPageBreak => {
+                out.push_str("<hr class=\"page-break rendered\">")
+            }
             RunContent::Field { .. }
             | RunContent::FootnoteRef { .. }
             | RunContent::EndnoteRef { .. } => {}

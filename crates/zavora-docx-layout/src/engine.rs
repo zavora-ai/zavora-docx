@@ -736,6 +736,9 @@ pub fn layout_paragraph(
 
         for content in &run.content {
             match content {
+                // Where the page ended last time. This engine works out its own pagination, so the
+                // previous answer is not an input to it.
+                RunContent::LastRenderedPageBreak => {}
                 RunContent::Text(ct_text) => {
                     let text = if effective_rpr.caps == Some(true) {
                         ct_text.text.to_uppercase()

@@ -42,6 +42,13 @@ pub enum RunContent {
     Text(CT_Text),
     Tab,
     Break(BreakType),
+    /// Where the page broke the last time a word processor laid this document out
+    /// (`<w:lastRenderedPageBreak/>`).
+    ///
+    /// Not an instruction — the author did not ask for it — but a record, and the only place the
+    /// file says where its pages actually end. Word writes them, and page 1 by this reckoning is
+    /// page 1 as the author last saw it.
+    LastRenderedPageBreak,
     Drawing(CT_Drawing),
     /// A simple field (from `<w:fldSimple>`).
     Field {
@@ -93,6 +100,8 @@ impl CT_R {
                 RunContent::Text(t) => result.push_str(&t.text),
                 RunContent::Tab => result.push('\t'),
                 RunContent::Break(_) => result.push('\n'),
+                // A record of where a page ended, not text.
+                RunContent::LastRenderedPageBreak => {}
                 RunContent::Drawing(_) => {} // Drawings have no text content
                 RunContent::Field { .. } => {} // Fields have no static text
                 RunContent::FootnoteRef { .. } | RunContent::EndnoteRef { .. } => {}
@@ -146,6 +155,8 @@ impl CT_R {
                     let name = e.name();
                     if matches_local_name(name.as_ref(), b"tab") {
                         content.push(RunContent::Tab);
+                    } else if matches_local_name(name.as_ref(), b"lastRenderedPageBreak") {
+                        content.push(RunContent::LastRenderedPageBreak);
                     } else if matches_local_name(name.as_ref(), b"br") {
                         let break_type = e
                             .attributes()
@@ -213,6 +224,13 @@ impl CT_R {
                 }
                 RunContent::Tab => {
                     writer.write_event(Event::Empty(BytesStart::new("w:tab")))?;
+                }
+                // Written back as it came. It is Word's record of where the page ended, and
+                // dropping it would lose the only account the file gives of its own pagination.
+                RunContent::LastRenderedPageBreak => {
+                    writer.write_event(Event::Empty(BytesStart::new(
+                        "w:lastRenderedPageBreak",
+                    )))?;
                 }
                 RunContent::Break(bt) => {
                     let mut e = BytesStart::new("w:br");

@@ -202,6 +202,8 @@ fn collect_run_text(run: &CT_R) -> String {
         match content {
             RunContent::Text(t) => raw.push_str(&t.text),
             RunContent::Tab => raw.push('\t'),
+            // A record of where a page ended. Markdown has no pages.
+            RunContent::LastRenderedPageBreak => {}
             RunContent::Break(bt) => match bt {
                 BreakType::Line => raw.push_str("  \n"),
                 BreakType::Page => raw.push_str("\n---\n"),
