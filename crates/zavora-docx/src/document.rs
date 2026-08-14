@@ -3443,10 +3443,10 @@ impl Document {
                             );
                         }
                     }
-                    t if t == rel_types::HYPERLINK => {
-                        if rel.target_mode.as_ref().is_some_and(|m| m == "External") {
-                            hyperlink_urls.insert(rel.id.clone(), rel.target.clone());
-                        }
+                    t if t == rel_types::HYPERLINK
+                        && rel.target_mode.as_ref().is_some_and(|m| m == "External") =>
+                    {
+                        hyperlink_urls.insert(rel.id.clone(), rel.target.clone());
                     }
                     _ => {}
                 }
