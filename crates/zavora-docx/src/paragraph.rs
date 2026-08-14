@@ -188,9 +188,6 @@ impl<'a> Paragraph<'a> {
         }
     }
 
-    /// Add a bookmark at this paragraph. The bookmark wraps all content in the paragraph.
-    /// Use `id` as a unique integer and `name` as the bookmark name for cross-references.
-
     /// Make this paragraph a drop cap (large first letter spanning multiple lines).
     /// `lines` is how many lines the drop cap spans (typically 2-4).
     pub fn drop_cap(mut self, lines: u32) -> Self {
@@ -198,6 +195,8 @@ impl<'a> Paragraph<'a> {
         self
     }
 
+    /// Add a bookmark at this paragraph. The bookmark wraps all content in the paragraph.
+    /// Use `id` as a unique integer and `name` as the bookmark name for cross-references.
     pub fn bookmark(&mut self, id: u32, name: &str) {
         let bm = zavora_docx_oxml::bookmark::CT_Bookmark::new(id, name);
         // bookmarkStart before all runs, bookmarkEnd after all runs

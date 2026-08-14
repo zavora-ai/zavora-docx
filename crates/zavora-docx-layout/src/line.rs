@@ -757,11 +757,12 @@ mod tests {
     #[test]
     fn words_wrap_to_multiple_lines() {
         let fm = FontManager::new();
-        let mut items = Vec::new();
         // Each word is 200pt wide, line is 468pt → should wrap
-        items.push(InlineItem::Text(make_text_segment("Word1", 200.0)));
-        items.push(InlineItem::Text(make_text_segment("Word2", 200.0)));
-        items.push(InlineItem::Text(make_text_segment("Word3", 200.0)));
+        let items = vec![
+            InlineItem::Text(make_text_segment("Word1", 200.0)),
+            InlineItem::Text(make_text_segment("Word2", 200.0)),
+            InlineItem::Text(make_text_segment("Word3", 200.0)),
+        ];
 
         let lines = break_into_lines(&items, &LineBreakParams::default(), &fm).unwrap();
         assert!(lines.len() >= 2);

@@ -233,7 +233,9 @@ fn math_text(xml: &str) -> String {
     while let Some(at) = rest.find("<m:t") {
         rest = &rest[at..];
         let Some(open) = rest.find('>') else { break };
-        let Some(close) = rest[open..].find("</m:t>") else { break };
+        let Some(close) = rest[open..].find("</m:t>") else {
+            break;
+        };
         text.push_str(&rest[open + 1..open + close]);
         rest = &rest[open + close..];
     }
@@ -387,9 +389,7 @@ fn emit_run(
             // Where the page ended when this document was last laid out. Marked apart from an
             // author's own page break: one is a record, the other an instruction, and an interface
             // showing pages wants both.
-            RunContent::LastRenderedPageBreak => {
-                out.push_str("<hr class=\"page-break rendered\">")
-            }
+            RunContent::LastRenderedPageBreak => out.push_str("<hr class=\"page-break rendered\">"),
             RunContent::Field { .. }
             | RunContent::FootnoteRef { .. }
             | RunContent::EndnoteRef { .. } => {}

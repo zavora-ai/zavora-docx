@@ -228,9 +228,7 @@ impl CT_R {
                 // Written back as it came. It is Word's record of where the page ended, and
                 // dropping it would lose the only account the file gives of its own pagination.
                 RunContent::LastRenderedPageBreak => {
-                    writer.write_event(Event::Empty(BytesStart::new(
-                        "w:lastRenderedPageBreak",
-                    )))?;
+                    writer.write_event(Event::Empty(BytesStart::new("w:lastRenderedPageBreak")))?;
                 }
                 RunContent::Break(bt) => {
                     let mut e = BytesStart::new("w:br");
@@ -627,7 +625,7 @@ fn unwrap_tracked(raw: &[u8], is_ins: bool) -> Vec<u8> {
             s.rfind("</w:del>")
         },
     ) {
-        (Some(open), Some(close)) if open + 1 <= close => &s[open + 1..close],
+        (Some(open), Some(close)) if open < close => &s[open + 1..close],
         _ => return raw.to_vec(),
     };
     let inner = if is_ins {

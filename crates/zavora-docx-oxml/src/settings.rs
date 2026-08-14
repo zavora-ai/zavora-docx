@@ -128,9 +128,9 @@ impl CT_Settings {
         root.push_attribute(("xmlns:w", W_NS));
         writer.write_event(Event::Start(root))?;
 
-        if self.zoom_percent.is_some() {
+        if let Some(zoom_percent) = self.zoom_percent {
             let mut z = BytesStart::new("w:zoom");
-            let v = self.zoom_percent.unwrap().to_string();
+            let v = zoom_percent.to_string();
             z.push_attribute(("w:percent", v.as_str()));
             writer.write_event(Event::Empty(z))?;
         }
