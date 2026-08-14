@@ -34,7 +34,8 @@ fn main() {
         samples_dir.display()
     );
 
-    let generators: Vec<(&str, fn(&Path) -> Document)> = vec![
+    type SampleGenerator = fn(&Path) -> Document;
+    let generators: Vec<(&str, SampleGenerator)> = vec![
         ("feature_showcase", generate_feature_showcase),
         ("proposal", generate_proposal),
         ("quote", generate_quote),
@@ -587,20 +588,18 @@ fn generate_feature_showcase(_samples_dir: &Path) -> Document {
     doc.add_style(
         StyleBuilder::paragraph("CustomHighlight", "Custom Highlight")
             .based_on("Normal")
-            .paragraph_properties({
-                let mut ppr = zavora_docx_oxml::properties::CT_PPr::default();
-                ppr.shading = Some(zavora_docx_oxml::properties::CT_Shd {
+            .paragraph_properties(zavora_docx_oxml::properties::CT_PPr {
+                shading: Some(zavora_docx_oxml::properties::CT_Shd {
                     val: "clear".to_string(),
                     color: None,
                     fill: Some("FFF2CC".to_string()),
-                });
-                ppr
+                }),
+                ..Default::default()
             })
-            .run_properties({
-                let mut rpr = zavora_docx_oxml::properties::CT_RPr::default();
-                rpr.bold = Some(true);
-                rpr.color = Some("C45911".to_string());
-                rpr
+            .run_properties(zavora_docx_oxml::properties::CT_RPr {
+                bold: Some(true),
+                color: Some("C45911".to_string()),
+                ..Default::default()
             }),
     );
     doc.add_paragraph("This paragraph uses a custom style: bold orange text on yellow background.")
@@ -751,14 +750,13 @@ fn generate_proposal(_samples_dir: &Path) -> Document {
     doc.add_style(
         StyleBuilder::paragraph("ProposalTitle", "Proposal Title")
             .based_on("Normal")
-            .run_properties({
-                let mut rpr = zavora_docx_oxml::properties::CT_RPr::default();
-                rpr.bold = Some(true);
-                rpr.font_ascii = Some("Georgia".to_string());
-                rpr.font_hansi = Some("Georgia".to_string());
-                rpr.sz = Some(zavora_docx_oxml::HalfPoint(56)); // half-points → 28pt
-                rpr.color = Some("1B2A4A".to_string());
-                rpr
+            .run_properties(zavora_docx_oxml::properties::CT_RPr {
+                bold: Some(true),
+                font_ascii: Some("Georgia".to_string()),
+                font_hansi: Some("Georgia".to_string()),
+                sz: Some(zavora_docx_oxml::HalfPoint(56)), // half-points → 28pt
+                color: Some("1B2A4A".to_string()),
+                ..Default::default()
             }),
     );
 

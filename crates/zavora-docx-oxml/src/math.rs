@@ -281,10 +281,10 @@ fn lex(src: &str) -> Vec<Tok> {
 fn parse_seq(toks: &[Tok], pos: &mut usize, stop: Option<&Tok>) -> MathNode {
     let mut items: Vec<MathNode> = Vec::new();
     while *pos < toks.len() {
-        if let Some(s) = stop {
-            if &toks[*pos] == s {
-                break;
-            }
+        if let Some(s) = stop
+            && &toks[*pos] == s
+        {
+            break;
         }
         match &toks[*pos] {
             Tok::Close => break,
@@ -375,12 +375,12 @@ fn parse_cmd(name: &str, toks: &[Tok], pos: &mut usize) -> MathNode {
             let beg = take_delim(toks, pos);
             let mut inner = Vec::new();
             while *pos < toks.len() {
-                if let Tok::Cmd(c) = &toks[*pos] {
-                    if c == "right" {
-                        *pos += 1;
-                        let _ = take_delim(toks, pos);
-                        break;
-                    }
+                if let Tok::Cmd(c) = &toks[*pos]
+                    && c == "right"
+                {
+                    *pos += 1;
+                    let _ = take_delim(toks, pos);
+                    break;
                 }
                 inner.push(parse_atom(toks, pos));
             }
@@ -434,12 +434,12 @@ fn flatten(mut v: Vec<MathNode>) -> MathNode {
 }
 
 fn take_delim(toks: &[Tok], pos: &mut usize) -> String {
-    if *pos < toks.len() {
-        if let Tok::Sym(s) = &toks[*pos] {
-            let d = s.clone();
-            *pos += 1;
-            return d;
-        }
+    if *pos < toks.len()
+        && let Tok::Sym(s) = &toks[*pos]
+    {
+        let d = s.clone();
+        *pos += 1;
+        return d;
     }
     "(".to_string()
 }

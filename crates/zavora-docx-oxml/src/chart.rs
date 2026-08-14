@@ -247,13 +247,13 @@ impl Chart {
             w.write_event(Event::End(BytesEnd::new("c:txPr")))?;
         }
         // dLblPos is only valid for pie/bar/column.
-        if let Some(pos) = labels.position {
-            if matches!(
+        if let Some(pos) = labels.position
+            && matches!(
                 self.kind,
                 ChartKind::Pie | ChartKind::Bar | ChartKind::Column
-            ) {
-                str_el(w, "c:dLblPos", pos.as_str())?;
-            }
+            )
+        {
+            str_el(w, "c:dLblPos", pos.as_str())?;
         }
         bool_el(w, "c:showLegendKey", labels.show_legend_key)?;
         bool_el(w, "c:showVal", labels.show_value)?;
@@ -489,9 +489,8 @@ mod tests {
         // Must be well-formed (re-parse with a reader to catch tag mismatches).
         let mut rdr = quick_xml::Reader::from_reader(bytes.as_slice());
         loop {
-            match rdr.read_event().expect("well-formed chart XML") {
-                quick_xml::events::Event::Eof => break,
-                _ => {}
+            if rdr.read_event().expect("well-formed chart XML") == quick_xml::events::Event::Eof {
+                break;
             }
         }
         let x = String::from_utf8(bytes).unwrap();
@@ -517,9 +516,8 @@ mod tests {
         let bytes = c.to_part_bytes().unwrap();
         let mut rdr = quick_xml::Reader::from_reader(bytes.as_slice());
         loop {
-            match rdr.read_event().expect("well-formed") {
-                quick_xml::events::Event::Eof => break,
-                _ => {}
+            if rdr.read_event().expect("well-formed") == quick_xml::events::Event::Eof {
+                break;
             }
         }
         let x = String::from_utf8(bytes).unwrap();

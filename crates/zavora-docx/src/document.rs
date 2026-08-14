@@ -328,19 +328,19 @@ impl Document {
         }
 
         // Serialize docProps/app.xml extended properties if present.
-        if let Some(ref app) = self.app_properties {
-            if !app.is_empty() {
-                let xml = app.to_xml()?;
-                self.package.set_part("/docProps/app.xml", xml);
-                self.package.content_types.add_override(
-                    "/docProps/app.xml",
-                    "application/vnd.openxmlformats-officedocument.extended-properties+xml",
-                );
-                self.package.package_rels.add_if_absent(
-                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
-                    "docProps/app.xml",
-                );
-            }
+        if let Some(ref app) = self.app_properties
+            && !app.is_empty()
+        {
+            let xml = app.to_xml()?;
+            self.package.set_part("/docProps/app.xml", xml);
+            self.package.content_types.add_override(
+                "/docProps/app.xml",
+                "application/vnd.openxmlformats-officedocument.extended-properties+xml",
+            );
+            self.package.package_rels.add_if_absent(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+                "docProps/app.xml",
+            );
         }
 
         // Serialize footnotes.xml if we have footnotes
@@ -586,7 +586,8 @@ impl Document {
         }
     }
 
-    /// Append a block-level mathematical equation built from a [`MathNode`] tree.
+    /// Append a block-level mathematical equation built from a
+    /// [`MathNode`](zavora_docx_oxml::math::MathNode) tree.
     pub fn add_equation(&mut self, math: &zavora_docx_oxml::math::MathNode) {
         if let Ok(bytes) = math.to_omath_para_bytes() {
             // Math is paragraph content (EG_PContent): wrap the oMathPara in a
@@ -907,7 +908,8 @@ impl Document {
     }
 
     /// Add an inline picture with extra features (rotation, crop, border,
-    /// shadow, flips, alt-text title) via [`PicProps`].
+    /// shadow, flips, alt-text title) via
+    /// [`PicProps`](zavora_docx_oxml::drawing::PicProps).
     pub fn add_picture_with(
         &mut self,
         image_data: &[u8],
@@ -1017,7 +1019,7 @@ impl Document {
     }
 
     /// Add a full-page (full-bleed) background image anchored to the page that
-    /// the paragraph at `index` falls on. Unlike [`add_background_image`] (which
+    /// the paragraph at `index` falls on. Unlike [`Self::add_background_image`] (which
     /// only covers page 1), this lets each page/spread have its own background —
     /// essential for children's books and illustrated interiors. Place a
     /// `page_break_before` paragraph at `index` so the image anchors to that page.
@@ -1268,8 +1270,10 @@ impl Document {
         let mut p = CT_P::new();
 
         // Center alignment
-        let mut ppr = CT_PPr::default();
-        ppr.jc = Some(zavora_docx_oxml::shared::ST_Jc::Center);
+        let ppr = CT_PPr {
+            jc: Some(zavora_docx_oxml::shared::ST_Jc::Center),
+            ..Default::default()
+        };
         p.properties = Some(ppr);
 
         // Add a run with PAGE field
@@ -3322,12 +3326,7 @@ impl Document {
         self.build_html_input()
             .images
             .iter()
-            .map(|(id, image)| {
-                (
-                    id.clone(),
-                    (image.content_type.clone(), image.data.clone()),
-                )
-            })
+            .map(|(id, image)| (id.clone(), (image.content_type.clone(), image.data.clone())))
             .collect()
     }
 
@@ -3340,7 +3339,7 @@ impl Document {
             (t.map(|v| v.0).unwrap_or(default) as f64) / 15.0
         };
         let s = self.document.body.sect_pr.as_ref();
-        let layout = PageLayout {
+        PageLayout {
             page_width: tw_px(s.and_then(|s| s.page_width), 12240),
             page_height: tw_px(s.and_then(|s| s.page_height), 15840),
             margin_top: tw_px(s.and_then(|s| s.margin_top), 1440),
@@ -3349,8 +3348,7 @@ impl Document {
             margin_left: tw_px(s.and_then(|s| s.margin_left), 1440),
             header_html: self.hdrftr_html(zavora_docx_opc::relationship::rel_types::HEADER),
             footer_html: self.hdrftr_html(zavora_docx_opc::relationship::rel_types::FOOTER),
-        };
-        layout
+        }
     }
 
     /// Render the (default) header or footer part to an HTML fragment, or "" if none.
@@ -3445,10 +3443,10 @@ impl Document {
                             );
                         }
                     }
-                    t if t == rel_types::HYPERLINK => {
-                        if rel.target_mode.as_ref().is_some_and(|m| m == "External") {
-                            hyperlink_urls.insert(rel.id.clone(), rel.target.clone());
-                        }
+                    t if t == rel_types::HYPERLINK
+                        && rel.target_mode.as_ref().is_some_and(|m| m == "External") =>
+                    {
+                        hyperlink_urls.insert(rel.id.clone(), rel.target.clone());
                     }
                     _ => {}
                 }

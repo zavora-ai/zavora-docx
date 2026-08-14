@@ -35,7 +35,8 @@ fn a_realistic_document(path: &str) {
     let _ = std::fs::remove_file(path);
     let mut doc = Document::new();
 
-    doc.add_paragraph("Master Services Agreement").style("Heading1");
+    doc.add_paragraph("Master Services Agreement")
+        .style("Heading1");
     doc.add_paragraph("This agreement is made between the parties named below.");
     doc.add_paragraph("1. Definitions").style("Heading2");
     {
@@ -78,9 +79,18 @@ fn the_fixture_has_the_furniture() {
     let parts = parts_of(path);
     assert!(body.contains("<w:tbl"), "a table");
     assert!(body.contains("Heading1"), "a styled heading");
-    assert!(body.contains("<w:b/>") || body.contains("<w:b "), "bold text");
-    assert!(parts.iter().any(|n| n.contains("header")), "a header: {parts:?}");
-    assert!(parts.iter().any(|n| n.contains("media/")), "a picture: {parts:?}");
+    assert!(
+        body.contains("<w:b/>") || body.contains("<w:b "),
+        "bold text"
+    );
+    assert!(
+        parts.iter().any(|n| n.contains("header")),
+        "a header: {parts:?}"
+    );
+    assert!(
+        parts.iter().any(|n| n.contains("media/")),
+        "a picture: {parts:?}"
+    );
 }
 
 /// Editing a paragraph elsewhere must not take the rest of the document with it.
@@ -96,13 +106,19 @@ fn changing_one_paragraph_keeps_the_rest() {
 
     let body = body_of(path);
     let parts = parts_of(path);
-    assert!(body.contains("Zavora and the client"), "the change should be there");
+    assert!(
+        body.contains("Zavora and the client"),
+        "the change should be there"
+    );
     assert_eq!(
         body.matches("<w:tbl>").count(),
         tables_before,
         "the table went missing when a different paragraph was changed"
     );
-    assert!(body.contains("Master Services Agreement"), "the heading text went");
+    assert!(
+        body.contains("Master Services Agreement"),
+        "the heading text went"
+    );
     assert!(body.contains("Heading1"), "the heading's style went");
     for wanted in ["header", "footer", "media/"] {
         assert!(
@@ -126,7 +142,10 @@ fn changing_a_headings_words_leaves_it_a_heading() {
     doc.save(path).expect("saving");
 
     let body = body_of(path);
-    assert!(body.contains("Master Services Agreement (2026)"), "the new words");
+    assert!(
+        body.contains("Master Services Agreement (2026)"),
+        "the new words"
+    );
     assert!(
         body.contains("Heading1"),
         "the heading became body text: changing its words took its style"

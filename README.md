@@ -1,7 +1,7 @@
 # zavora-docx
 
 [![License: MIT/Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
-[![MSRV: 1.93](https://img.shields.io/badge/MSRV-1.93-blue.svg)](https://blog.rust-lang.org/2026/01/09/Rust-1.93.0.html)
+[![MSRV: 1.94.1](https://img.shields.io/badge/MSRV-1.94.1-blue.svg)](https://www.rust-lang.org/tools/install)
 
 A pure Rust DOCX library — create, read, and modify Word documents programmatically. Additionally, render pixel-identical PDFs and export to HTML and Markdown, all from the same document object. No LibreOffice, no unoconv, no C dependencies.
 
@@ -282,7 +282,7 @@ Java solutions carry the JVM's baseline overhead: 50-100 MB of RAM before a sing
 
 ## Minimum Supported Rust Version
 
-1.93 (edition 2024)
+1.94.1 (edition 2024)
 
 ## License
 
