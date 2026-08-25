@@ -428,17 +428,15 @@ impl CT_TblGrid {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Empty(ref e)) => {
-                    if matches_local_name(e.name().as_ref(), b"gridCol") {
-                        let mut width = Twips(0);
-                        for attr in e.attributes() {
-                            let attr = attr?;
-                            if matches_local_name(attr.key.as_ref(), b"w") {
-                                width = Twips(std::str::from_utf8(&attr.value)?.parse()?);
-                            }
+                Ok(Event::Empty(ref e)) if matches_local_name(e.name().as_ref(), b"gridCol") => {
+                    let mut width = Twips(0);
+                    for attr in e.attributes() {
+                        let attr = attr?;
+                        if matches_local_name(attr.key.as_ref(), b"w") {
+                            width = Twips(std::str::from_utf8(&attr.value)?.parse()?);
                         }
-                        columns.push(CT_TblGridCol { width });
                     }
+                    columns.push(CT_TblGridCol { width });
                 }
                 Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), b"tblGrid") => {
                     break;

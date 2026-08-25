@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.4] - 2026-08-25
+
+### Security
+
+- Upgraded `quick-xml` to 0.41 to close the namespace-allocation and duplicate-
+  attribute denial-of-service advisories.
+- Migrated text and entity-reference handling to the hardened parser event model
+  without losing escaped document-property content.
+
 ## [0.1.3] - 2026-08-14
 
 ### Added

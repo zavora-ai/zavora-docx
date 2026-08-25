@@ -183,10 +183,8 @@ fn parse_font_scheme(reader: &mut Reader<&[u8]>, end_tag: &[u8]) -> Result<Optio
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Empty(ref e)) => {
-                if matches_local_name(e.name().as_ref(), b"latin") {
-                    latin_font = get_attr(e, b"typeface");
-                }
+            Ok(Event::Empty(ref e)) if matches_local_name(e.name().as_ref(), b"latin") => {
+                latin_font = get_attr(e, b"typeface");
             }
             Ok(Event::End(ref e)) if matches_local_name(e.name().as_ref(), end_tag) => break,
             Ok(Event::Eof) => break,

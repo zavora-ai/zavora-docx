@@ -35,6 +35,7 @@ pub mod table;
 pub mod text;
 pub mod theme;
 pub mod units;
+mod xml_compat;
 
 pub use borders::{CT_BorderEdge, CT_PBdr, CT_TabStop, CT_Tabs};
 pub use document::{BodyContent, CT_Body, CT_Document, CT_SectPr};

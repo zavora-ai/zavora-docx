@@ -19,5 +19,5 @@ for package in "${packages[@]}"; do
     echo "${package} ${version} is already published"
     continue
   fi
-  cargo publish --locked --no-verify -p "${package}"
+  cargo publish --locked -p "${package}"
 done

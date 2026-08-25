@@ -429,7 +429,7 @@ pub fn replace_in_chart_xml(
                 writer.write_event(Event::Start(e.clone()))?;
             }
             Ok(Event::Text(ref e)) if in_text_element => {
-                let text = e.unescape().unwrap_or_default().to_string();
+                let text = crate::xml_compat::decode_text(e);
                 if text.contains(placeholder) {
                     let new_text = text.replace(placeholder, replacement);
                     let occurrences = text.matches(placeholder).count();

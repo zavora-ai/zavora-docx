@@ -720,10 +720,8 @@ impl CT_Document {
                         reader.read_to_end_into(name, &mut Vec::new())?;
                     }
                 }
-                Ok(Event::Empty(ref e)) => {
-                    if matches_local_name(e.name().as_ref(), b"background") {
-                        background_xml = Some(capture_empty_element(e)?);
-                    }
+                Ok(Event::Empty(ref e)) if matches_local_name(e.name().as_ref(), b"background") => {
+                    background_xml = Some(capture_empty_element(e)?);
                 }
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(e.into()),

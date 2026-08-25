@@ -133,12 +133,8 @@ impl CT_R {
                         });
                         let text = reader
                             .read_text(name)
-                            .map(|t| {
-                                // Unescape XML entities (&amp; &lt; &gt; &quot; &apos;)
-                                quick_xml::escape::unescape(&t)
-                                    .map(|u| u.to_string())
-                                    .unwrap_or_else(|_| t.to_string())
-                            })
+                            .ok()
+                            .and_then(|text| text.decode().ok().map(|text| text.into_owned()))
                             .unwrap_or_default();
                         content.push(RunContent::Text(CT_Text {
                             text,

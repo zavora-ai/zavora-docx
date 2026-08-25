@@ -4,6 +4,7 @@ use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 
 use crate::error::Result;
+use crate::xml_compat::{decode_reference, decode_text};
 
 const NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
 
@@ -26,7 +27,9 @@ impl AppProperties {
 
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         let mut reader = Reader::from_reader(xml);
-        reader.config_mut().trim_text(true);
+        // Entity references are emitted as separate events in quick-xml 0.41;
+        // trimming each adjacent text event would remove meaningful spaces.
+        reader.config_mut().trim_text(false);
         let mut p = AppProperties::default();
         let mut buf = Vec::new();
         let mut tag: Option<String> = None;
@@ -37,19 +40,15 @@ impl AppProperties {
                 }
                 Event::Text(ref e) => {
                     if let Some(ref t) = tag {
-                        let v = e.unescape().unwrap_or_default().to_string();
+                        let v = decode_text(e);
                         if !v.is_empty() {
-                            match t.as_str() {
-                                "Application" => p.application = Some(v),
-                                "AppVersion" => p.app_version = Some(v),
-                                "Company" => p.company = Some(v),
-                                "Template" => p.template = Some(v),
-                                "Pages" => p.pages = v.parse().ok(),
-                                "Words" => p.words = v.parse().ok(),
-                                "Characters" => p.characters = v.parse().ok(),
-                                _ => {}
-                            }
+                            append_value(&mut p, t, &v);
                         }
+                    }
+                }
+                Event::GeneralRef(ref reference) => {
+                    if let Some(ref t) = tag {
+                        append_value(&mut p, t, &decode_reference(reference));
                     }
                 }
                 Event::End(_) => tag = None,
@@ -102,6 +101,27 @@ impl AppProperties {
     }
 }
 
+fn append_value(properties: &mut AppProperties, tag: &str, value: &str) {
+    let field = match tag {
+        "Application" => Some(&mut properties.application),
+        "AppVersion" => Some(&mut properties.app_version),
+        "Company" => Some(&mut properties.company),
+        "Template" => Some(&mut properties.template),
+        _ => None,
+    };
+    if let Some(field) = field {
+        field.get_or_insert_default().push_str(value);
+        return;
+    }
+
+    match tag {
+        "Pages" => properties.pages = value.trim().parse().ok(),
+        "Words" => properties.words = value.trim().parse().ok(),
+        "Characters" => properties.characters = value.trim().parse().ok(),
+        _ => {}
+    }
+}
+
 fn local(name: &[u8]) -> &str {
     let s = std::str::from_utf8(name).unwrap_or("");
     s.rsplit(':').next().unwrap_or(s)
@@ -115,17 +135,20 @@ mod tests {
     fn round_trips() {
         let p = AppProperties {
             application: Some("zavora-docx".into()),
-            company: Some("Zavora".into()),
+            company: Some("Zavora & Partners".into()),
             pages: Some(3),
             words: Some(120),
             ..Default::default()
         };
         let xml = p.to_xml().unwrap();
         let s = String::from_utf8(xml.clone()).unwrap();
-        assert!(s.contains("<Company>Zavora</Company>"), "{s}");
+        assert!(
+            s.contains("<Company>Zavora &amp; Partners</Company>"),
+            "{s}"
+        );
         assert!(s.contains("<Words>120</Words>"), "{s}");
         let parsed = AppProperties::from_xml(&xml).unwrap();
-        assert_eq!(parsed.company.as_deref(), Some("Zavora"));
+        assert_eq!(parsed.company.as_deref(), Some("Zavora & Partners"));
         assert_eq!(parsed.pages, Some(3));
     }
 }

@@ -102,14 +102,12 @@ fn decode_png(data: &[u8]) -> Option<DecodedImage> {
         }
 
         match chunk_type {
-            b"IHDR" => {
-                if chunk_len >= 13 {
-                    let d = &data[chunk_data_start..];
-                    width = u32::from_be_bytes([d[0], d[1], d[2], d[3]]);
-                    height = u32::from_be_bytes([d[4], d[5], d[6], d[7]]);
-                    bit_depth = d[8];
-                    color_type = d[9];
-                }
+            b"IHDR" if chunk_len >= 13 => {
+                let d = &data[chunk_data_start..];
+                width = u32::from_be_bytes([d[0], d[1], d[2], d[3]]);
+                height = u32::from_be_bytes([d[4], d[5], d[6], d[7]]);
+                bit_depth = d[8];
+                color_type = d[9];
             }
             b"IDAT" => {
                 idat_data.extend_from_slice(&data[chunk_data_start..chunk_data_end]);

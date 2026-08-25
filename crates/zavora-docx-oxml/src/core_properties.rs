@@ -4,6 +4,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use crate::error::Result;
+use crate::xml_compat::{decode_reference, decode_text};
 
 /// Document metadata from `docProps/core.xml` (Dublin Core).
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -44,7 +45,9 @@ impl CoreProperties {
     /// Parse `docProps/core.xml` content.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         let mut reader = Reader::from_reader(xml);
-        reader.config_mut().trim_text(true);
+        // Entity references are emitted as separate events in quick-xml 0.41;
+        // trimming each adjacent text event would remove meaningful spaces.
+        reader.config_mut().trim_text(false);
 
         let mut props = CoreProperties::default();
         let mut buf = Vec::new();
@@ -69,27 +72,15 @@ impl CoreProperties {
                 }
                 Ok(Event::Text(ref e)) => {
                     if let Some(ref tag) = current_tag {
-                        let text = e.unescape().unwrap_or_default().to_string();
+                        let text = decode_text(e);
                         if !text.is_empty() {
-                            match tag.as_str() {
-                                "title" => props.title = Some(text),
-                                "creator" => props.creator = Some(text),
-                                "subject" => props.subject = Some(text),
-                                "description" => props.description = Some(text),
-                                "keywords" => props.keywords = Some(text),
-                                "lastModifiedBy" => props.last_modified_by = Some(text),
-                                "created" => props.created = Some(text),
-                                "modified" => props.modified = Some(text),
-                                "category" => props.category = Some(text),
-                                "contentStatus" => props.content_status = Some(text),
-                                "identifier" => props.identifier = Some(text),
-                                "language" => props.language = Some(text),
-                                "revision" => props.revision = Some(text),
-                                "version" => props.version = Some(text),
-                                "lastPrinted" => props.last_printed = Some(text),
-                                _ => {}
-                            }
+                            append_property(&mut props, tag, &text);
                         }
+                    }
+                }
+                Ok(Event::GeneralRef(ref reference)) => {
+                    if let Some(ref tag) = current_tag {
+                        append_property(&mut props, tag, &decode_reference(reference));
                     }
                 }
                 Ok(Event::End(_)) => {
@@ -179,6 +170,28 @@ impl CoreProperties {
     }
 }
 
+fn append_property(properties: &mut CoreProperties, tag: &str, value: &str) {
+    let field = match tag {
+        "title" => &mut properties.title,
+        "creator" => &mut properties.creator,
+        "subject" => &mut properties.subject,
+        "description" => &mut properties.description,
+        "keywords" => &mut properties.keywords,
+        "lastModifiedBy" => &mut properties.last_modified_by,
+        "created" => &mut properties.created,
+        "modified" => &mut properties.modified,
+        "category" => &mut properties.category,
+        "contentStatus" => &mut properties.content_status,
+        "identifier" => &mut properties.identifier,
+        "language" => &mut properties.language,
+        "revision" => &mut properties.revision,
+        "version" => &mut properties.version,
+        "lastPrinted" => &mut properties.last_printed,
+        _ => return,
+    };
+    field.get_or_insert_default().push_str(value);
+}
+
 /// Extract the local name (after the last `:`) from a qualified XML name.
 fn local_name(name: &[u8]) -> &str {
     let s = std::str::from_utf8(name).unwrap_or("");
@@ -224,7 +237,7 @@ mod tests {
     #[test]
     fn round_trip_core_properties() {
         let props = CoreProperties {
-            title: Some("My Title".to_string()),
+            title: Some("Research & Development".to_string()),
             creator: Some("Author".to_string()),
             subject: None,
             description: None,

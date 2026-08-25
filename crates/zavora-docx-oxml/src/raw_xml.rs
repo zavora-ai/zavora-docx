@@ -57,6 +57,9 @@ pub fn capture_element(reader: &mut Reader<&[u8]>, start: &BytesStart) -> Result
             Ok(Event::DocType(ref e)) => {
                 writer.write_event(Event::DocType(e.to_owned().into_owned()))?;
             }
+            Ok(Event::GeneralRef(ref e)) => {
+                writer.write_event(Event::GeneralRef(e.to_owned().into_owned()))?;
+            }
             Ok(Event::Eof) => break,
             Err(e) => return Err(e.into()),
         }
