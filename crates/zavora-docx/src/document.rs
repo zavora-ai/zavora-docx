@@ -727,7 +727,7 @@ impl Document {
         use zavora_docx_oxml::units::Twips;
 
         // Default column width: divide 9360tw (6.5" printable at 1" margins) evenly
-        let col_width = Twips(9360 / cols as i32);
+        let col_width = Twips(9360 / (cols.max(1)) as i32);
 
         let grid = CT_TblGrid {
             columns: (0..cols)
@@ -774,6 +774,7 @@ impl Document {
     /// Returns a mutable `Paragraph` for further configuration.
     /// Panics if `index > content_count()`.
     pub fn insert_paragraph(&mut self, index: usize, text: &str) -> Paragraph<'_> {
+        let index = index.min(self.document.body.content.len());
         let mut p = CT_P::new();
         if !text.is_empty() {
             p.add_run(text);
@@ -790,12 +791,13 @@ impl Document {
     /// Returns a mutable `Table` for further configuration.
     /// Panics if `index > content_count()`.
     pub fn insert_table(&mut self, index: usize, rows: usize, cols: usize) -> Table<'_> {
+        let index = index.min(self.document.body.content.len());
         use zavora_docx_oxml::table::{
             CT_Row, CT_TblGrid, CT_TblGridCol, CT_TblPr, CT_TblWidth, CT_Tc,
         };
         use zavora_docx_oxml::units::Twips;
 
-        let col_width = Twips(9360 / cols as i32);
+        let col_width = Twips(9360 / (cols.max(1)) as i32);
         let grid = CT_TblGrid {
             columns: (0..cols)
                 .map(|_| CT_TblGridCol { width: col_width })

@@ -547,6 +547,7 @@ impl CT_Body {
     ///
     /// Panics if `index > content_count()`.
     pub fn insert_paragraph(&mut self, index: usize, p: CT_P) {
+        let index = index.min(self.content.len());
         self.content.insert(index, BodyContent::Paragraph(p));
     }
 
@@ -554,6 +555,7 @@ impl CT_Body {
     ///
     /// Panics if `index > content_count()`.
     pub fn insert_table(&mut self, index: usize, tbl: CT_Tbl) {
+        let index = index.min(self.content.len());
         self.content.insert(index, BodyContent::Table(tbl));
     }
 
