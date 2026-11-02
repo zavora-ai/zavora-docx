@@ -34,7 +34,7 @@ zavora-docx-pdf = { path = "crates/zavora-docx-pdf", version = "0.1.4" }
 zavora-docx-html = { path = "crates/zavora-docx-html", version = "0.1.4" }
 
 # External dependencies
-zip = "8.1"
+zip = "9.1"
 quick-xml = "0.41"
 thiserror = "2"
 fontdb = "0.23"

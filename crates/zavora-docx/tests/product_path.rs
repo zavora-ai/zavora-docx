@@ -27,7 +27,7 @@ fn body_of(path: &str) -> String {
 fn parts_of(path: &str) -> Vec<String> {
     let file = std::fs::File::open(path).unwrap();
     let zip = zip::ZipArchive::new(file).unwrap();
-    zip.file_names().map(str::to_string).collect()
+    zip.file_names().map(|n| n.unwrap().into_owned()).collect()
 }
 
 /// A document with the furniture a real one has.
